@@ -23,6 +23,51 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private JwtUtils jwtUtils;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        String method = request.getMethod();
+        
+        // 对于WebSocket连接，必须完全跳过过滤
+        // 检查是否是WebSocket握手请求
+        boolean isWebSocketUpgrade = "GET".equals(method) && 
+                                   "websocket".equalsIgnoreCase(request.getHeader("Upgrade"));
+        
+        System.out.println("检查是否跳过JWT验证 - 路径: " + path + ", 方法: " + method + ", 是否WebSocket升级: " + isWebSocketUpgrade);
+        
+        // 优先检查WebSocket升级请求
+        if (isWebSocketUpgrade) {
+            System.out.println("检测到WebSocket握手请求，直接跳过过滤");
+            return true;
+        }
+        
+        // 检查路径匹配情况
+        boolean isPublicPath = path.startsWith("/public/");
+        boolean isApiWebSocketPath = path.startsWith("/api/websocket/");
+        boolean isStaticResource = path.endsWith(".html") || path.endsWith(".css") || path.endsWith(".js");
+        
+        // 详细日志记录
+        System.out.println("是否公开路径: " + isPublicPath + ", 是否WebSocket测试路径: " + isApiWebSocketPath + ", 是否静态资源: " + isStaticResource);
+        
+        // 跳过WebSocket相关的请求和其他公开路径
+        boolean skip = path.equals("/ws") || path.equals("/spring-ws") || path.equals("/simple-ws") 
+                || path.startsWith("/ws/") || path.startsWith("/spring-ws/") || path.startsWith("/simple-ws/")
+                || path.startsWith("/sockjs/") || path.startsWith("/app-ws")
+                // 跳过WebSocket测试控制器
+                || isApiWebSocketPath
+                // 跳过公开API路径
+                || path.startsWith("/api/auth/") || path.startsWith("/api/public/") || isPublicPath
+                // 跳过测试端点
+                || path.equals("/test-public") || path.equals("/test-websocket")
+                // 跳过Actuator和静态资源
+                || path.startsWith("/actuator/") || path.startsWith("/uploads/")
+                // 跳过静态文件
+                || isStaticResource || path.endsWith(".png") || path.endsWith(".jpg") || path.endsWith(".jpeg");
+        
+        System.out.println("跳过JWT验证决定: " + skip + " 对于路径: " + path);
+        return skip;
+    }
+    
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         System.out.println("处理请求: " + request.getMethod() + " " + request.getRequestURI());
         

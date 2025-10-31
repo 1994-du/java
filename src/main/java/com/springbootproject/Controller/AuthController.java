@@ -69,11 +69,15 @@ public class AuthController {
                         String token = jwtUtils.generateToken(username);
                         System.out.println("Token生成成功: " + (token != null && token.length() > 0 ? "是" : "否"));
                         
+                        // 获取用户ID
+                        Long userId = rs.getLong("id");
+                        
                         Map<String, Object> response = new HashMap<>();
                         response.put("success", true);
-                        response.put("status", 200);
+                        response.put("status", "success");
                         response.put("message", "登录成功");
                         response.put("username", username);
+                        response.put("userId", userId); // 添加用户ID到响应中
                         response.put("token", token);
                         response.put("tokenExpiration", "2小时"); // token过期时间描述
                         
@@ -152,7 +156,7 @@ public class AuthController {
                 // 注册成功，返回状态码和成功消息
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
-                response.put("status", 200);
+                    response.put("status", "success");
                 response.put("message", "注册成功");
                 response.put("username", username);
                 
@@ -219,7 +223,7 @@ public class AuthController {
                     // 密码重置成功
                     Map<String, Object> response = new HashMap<>();
                     response.put("success", true);
-                    response.put("status", 200);
+                    response.put("status", "success");
                     response.put("message", "密码重置成功");
                     response.put("username", username);
                     

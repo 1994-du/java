@@ -24,6 +24,11 @@ public class UserService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    // 通过ID查找用户
+    public User findUserById(Long userId) {
+        return userRepository.findById(userId).orElse(null);
+    }
+    
     // 通过用户名查找用户
     public User findUserByUsername(String username) {
         return userRepository.findByUsername(username);

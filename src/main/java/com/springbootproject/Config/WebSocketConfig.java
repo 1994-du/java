@@ -1,32 +1,30 @@
 package com.springbootproject.Config;
 
-import org.springframework.context.annotation.Configuration;
-import org.springframework.messaging.simp.config.MessageBrokerRegistry;
-import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
-import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
-import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import jakarta.websocket.HandshakeResponse;
+import jakarta.websocket.server.HandshakeRequest;
+import jakarta.websocket.server.ServerEndpointConfig;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
- * WebSocket配置类，启用WebSocket消息代理
+ * WebSocket配置类
  */
-@Configuration
-@EnableWebSocketMessageBroker
-public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+@Component
+public class WebSocketConfig extends ServerEndpointConfig.Configurator {
 
     @Override
-    public void configureMessageBroker(MessageBrokerRegistry config) {
-        // 启用简单消息代理，用于将消息广播到客户端
-        config.enableSimpleBroker("/topic", "/queue");
-        // 设置应用程序目的地前缀，客户端发送消息时需要使用这个前缀
-        config.setApplicationDestinationPrefixes("/app");
+    public void modifyHandshake(ServerEndpointConfig sec, HandshakeRequest request, HandshakeResponse response) {
+        // 获取请求参数
+        List<String> usernameList = request.getParameterMap().get("username");
+        String username = usernameList != null && !usernameList.isEmpty() ? usernameList.get(0) : "Anonymous";
+        
+        // 将用户名保存到WebSocket会话中
+        sec.getUserProperties().put("username", username);
     }
 
     @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // 注册WebSocket端点，客户端将使用这个端点连接到服务器
-        // withSockJS()提供了对不支持WebSocket的浏览器的兼容性支持
-        registry.addEndpoint("/ws")
-                .setAllowedOrigins("*") // 允许所有来源的连接，可以根据需要限制
-                .withSockJS();
+    public <T> T getEndpointInstance(Class<T> endpointClass) throws InstantiationException {
+        return super.getEndpointInstance(endpointClass);
     }
 }

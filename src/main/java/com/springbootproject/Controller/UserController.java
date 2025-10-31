@@ -38,7 +38,7 @@ public class UserController {
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("status", 200);
+        response.put("status", "success");
         response.put("message", "认证状态测试");
         response.put("isAuthenticated", isAuthenticated);
         response.put("authentication", authentication != null ? authentication.toString() : "null");
@@ -60,7 +60,7 @@ public class UserController {
         
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("status", 200);
+        response.put("status", "success");
         response.put("message", "获取用户信息成功");
         response.put("data", user);
         
@@ -82,7 +82,7 @@ public class UserController {
         // 构建响应
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("status", 200);
+        response.put("status", "success");
         response.put("message", "获取当前用户信息成功");
         response.put("username", username);
         
@@ -156,7 +156,7 @@ public class UserController {
         // 构建响应，返回前端需要的从1开始的页码
         Map<String, Object> response = new HashMap<>();
         response.put("success", true);
-        response.put("status", 200);
+        response.put("status", "success");
         response.put("message", "获取用户列表成功");
         response.put("data", userListWithoutPassword);
         response.put("total", userPage.getTotalElements());
@@ -206,7 +206,7 @@ public class UserController {
             System.out.println("用户创建成功，ID: " + newUser.getId() + ", 角色ID: " + newUser.getRoleId() + ", 角色名称: " + newUser.getRoleName());
             
             response.put("success", true);
-            response.put("status", 200);
+            response.put("status", "success");
             response.put("message", "用户创建成功");
             response.put("data", newUser);
             
@@ -256,7 +256,7 @@ public class UserController {
             userData.put("roleName", updatedUser.getRoleName());
             
             response.put("success", true);
-            response.put("status", 200);
+            response.put("status", "success");
             response.put("message", "密码重置成功，默认密码为：123456");
             response.put("data", userData);
             
@@ -311,7 +311,7 @@ public class UserController {
             userService.deleteUserById(userId);
             
             response.put("success", true);
-            response.put("status", 200);
+            response.put("status", "success");
             response.put("message", "用户删除成功");
             
             return ResponseEntity.ok(response);
@@ -370,7 +370,7 @@ public class UserController {
             String avatarUrl = "/uploads/avatars/" + filename;
             
             response.put("success", true);
-            response.put("status", 200);
+            response.put("status", "success");
             response.put("message", "文件上传成功");
             response.put("avatarUrl", avatarUrl);
             
@@ -426,7 +426,7 @@ public class UserController {
             userData.put("roleName", updatedUser.getRoleName());
             
             response.put("success", true);
-            response.put("status", 200);
+            response.put("status", "success");
             response.put("message", "用户信息更新成功");
             response.put("data", userData);
             

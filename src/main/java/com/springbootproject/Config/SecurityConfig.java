@@ -1,8 +1,5 @@
 package com.springbootproject.Config;
 
-import com.springbootproject.Security.JwtAuthenticationEntryPoint;
-import com.springbootproject.Security.JwtAuthenticationFilter;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -11,17 +8,10 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
-
-    @Autowired
-    private JwtAuthenticationEntryPoint unauthorizedHandler;
-
-    @Autowired
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -29,24 +19,20 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        // 最简单的安全配置，允许所有请求
         http
-            .csrf(csrf -> csrf.disable())
-            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/reset-password", "/api/getRoleDict").permitAll()
-                .requestMatchers("/actuator/**").permitAll() // 允许访问actuator端点
-                .requestMatchers("/uploads/**").permitAll() // 允许访问静态资源
-                // 允许WebSocket端点访问
-                .requestMatchers("/ws/**").permitAll()
-                .requestMatchers("/sockjs/**").permitAll()
-                .anyRequest().authenticated() // 其他所有请求都需要认证
+            .csrf(csrf -> csrf.disable()) // 完全禁用CSRF保护
+            .cors(cors -> cors.disable()) // 禁用CORS限制
+            .authorizeHttpRequests(authorize -> authorize
+                .anyRequest().permitAll() // 允许所有请求
+            )
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             );
-        
-        // 将JWT过滤器添加到过滤器链中
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        
+
+        System.out.println("安全配置: 已完全禁用安全限制，允许所有请求访问");
+
         return http.build();
     }
 }

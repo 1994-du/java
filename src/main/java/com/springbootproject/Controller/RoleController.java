@@ -52,7 +52,7 @@ public class RoleController {
             }
 
             response.put("success", true);
-            response.put("status", 200);
+            response.put("status", "success");
             response.put("message", "获取角色字典成功");
             response.put("data", roleList);
 
