@@ -1,8 +1,10 @@
 package com.springbootproject.Controller;
 
+import com.springbootproject.Entity.Menu;
 import com.springbootproject.Model.LoginRequest;
 import com.springbootproject.Model.RegisterRequest;
 import com.springbootproject.Model.ResetPasswordRequest;
+import com.springbootproject.Service.MenuService;
 import com.springbootproject.Util.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import java.util.List;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -19,6 +22,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -35,6 +39,10 @@ public class AuthController {
     // 注入JWT工具类，用于生成token
     @Autowired
     private JwtUtils jwtUtils;
+    
+    // 注入菜单服务，用于获取用户菜单数据
+    @Autowired
+    private MenuService menuService;
 
     // 登录接口
     @PostMapping("/login")
@@ -42,6 +50,24 @@ public class AuthController {
         // 从请求对象中获取用户名和密码
         String username = loginRequest.getUsername();
         String password = loginRequest.getPassword();
+        
+        // 添加空值检查
+        if (loginRequest == null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("status", 400);
+            response.put("message", "请求数据不能为空");
+            return ResponseEntity.badRequest().body(response);
+        }
+        
+        // 验证输入参数
+        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("status", 400);
+            response.put("message", "用户名和密码不能为空");
+            return ResponseEntity.badRequest().body(response);
+        }
         
         try (Connection connection = dataSource.getConnection();
              // 直接查询user表，因为数据源已经连接到localhost数据库
@@ -58,7 +84,7 @@ public class AuthController {
                 boolean bCryptMatch = passwordEncoder.matches(password, storedPassword);
                 
                 // 检查是否为明文密码匹配
-                boolean plainTextMatch = password.equals(storedPassword);
+                boolean plainTextMatch = Objects.equals(password, storedPassword);
                 
                 boolean passwordMatches = bCryptMatch || plainTextMatch;
                 
@@ -72,6 +98,9 @@ public class AuthController {
                         // 获取用户ID
                         Long userId = rs.getLong("id");
                         
+                        // 获取用户的菜单数据（树形结构）
+                        List<Menu> menusTree = menuService.getVisibleMenuTree();
+                        
                         Map<String, Object> response = new HashMap<>();
                         response.put("success", true);
                         response.put("status", "success");
@@ -80,6 +109,7 @@ public class AuthController {
                         response.put("userId", userId); // 添加用户ID到响应中
                         response.put("token", token);
                         response.put("tokenExpiration", "2小时"); // token过期时间描述
+                        response.put("menus", menusTree); // 添加用户菜单数据
                         
                         System.out.println("登录响应准备完成，即将返回");
                         return ResponseEntity.ok(response);
@@ -108,16 +138,25 @@ public class AuthController {
     // 注册接口
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest registerRequest) {
+        // 添加空值检查
+        if (registerRequest == null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("status", 400);
+            response.put("message", "请求数据不能为空");
+            return ResponseEntity.badRequest().body(response);
+        }
+        
         // 从请求对象中获取用户名和密码
         String username = registerRequest.getUsername();
         String password = registerRequest.getPassword();
         
         // 基本验证
-        if (username == null || username.trim().isEmpty() || password == null || password.length() < 6) {
+        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty() || password.length() < 6) {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("status", 400);
-            response.put("message", "用户名不能为空，密码长度不能少于6位");
+            response.put("message", "用户名不能为空，密码不能为空且长度不能少于6位");
             return ResponseEntity.badRequest().body(response);
         }
         
@@ -176,16 +215,25 @@ public class AuthController {
     // 密码重置接口
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest resetPasswordRequest) {
+        // 添加空值检查
+        if (resetPasswordRequest == null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("status", 400);
+            response.put("message", "请求数据不能为空");
+            return ResponseEntity.badRequest().body(response);
+        }
+        
         // 从请求对象中获取用户名和新密码
         String username = resetPasswordRequest.getUsername();
         String newPassword = resetPasswordRequest.getNewPassword();
         
         // 基本验证
-        if (username == null || username.trim().isEmpty() || newPassword == null || newPassword.length() < 6) {
+        if (username == null || username.trim().isEmpty() || newPassword == null || newPassword.trim().isEmpty() || newPassword.length() < 6) {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("status", 400);
-            response.put("message", "用户名不能为空，新密码长度不能少于6位");
+            response.put("message", "用户名不能为空，新密码不能为空且长度不能少于6位");
             return ResponseEntity.badRequest().body(response);
         }
         
