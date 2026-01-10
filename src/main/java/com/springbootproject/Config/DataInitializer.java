@@ -1,9 +1,12 @@
 package com.springbootproject.Config;
 
 import com.springbootproject.Entity.Menu;
+import com.springbootproject.Entity.User;
 import com.springbootproject.Repository.MenuRepository;
+import com.springbootproject.Repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
@@ -17,13 +20,46 @@ public class DataInitializer implements CommandLineRunner {
 
     @Autowired
     private MenuRepository menuRepository;
+    
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Override
     public void run(String... args) throws Exception {
+        // 初始化用户数据
+        initializeUsers();
+        
         // 检查是否已经有菜单数据，如果没有则初始化测试数据
         if (menuRepository.count() == 0) {
             initializeMenus();
         }
+    }
+    
+    /**
+     * 初始化测试用户
+     */
+    private void initializeUsers() {
+        // 强制重新创建管理员用户，确保密码字段正确
+        User adminUser = userRepository.findByUsername("admin");
+        if (adminUser == null) {
+            adminUser = new User();
+        }
+        
+        adminUser.setUsername("admin");
+        String encodedPassword = passwordEncoder.encode("admin");
+        adminUser.setPassword(encodedPassword);
+        adminUser.setAvatar("/api/user/avatar/default");
+        adminUser.setRoleId(1L);
+        adminUser.setRoleName("管理员");
+        
+        userRepository.save(adminUser);
+        System.out.println("初始化管理员用户完成: 用户名=admin, 密码=admin");
+        System.out.println("加密后的密码: " + encodedPassword);
+        System.out.println("密码长度: " + encodedPassword.length());
+        System.out.println("验证测试: " + passwordEncoder.matches("admin", encodedPassword));
     }
 
     /**

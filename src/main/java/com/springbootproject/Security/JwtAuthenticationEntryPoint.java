@@ -22,6 +22,12 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException, ServletException {
+        // 添加调试日志
+        System.out.println("JwtAuthenticationEntryPoint被调用，请求路径: " + request.getRequestURI());
+        System.out.println("请求方法: " + request.getMethod());
+        System.out.println("认证异常: " + authException.getMessage());
+        System.out.println("请求头Authorization: " + request.getHeader("Authorization"));
+        
         // 获取请求头中的token，支持有Bearer前缀和没有前缀的两种情况
         String authorizationHeader = request.getHeader("Authorization");
         String token = null;

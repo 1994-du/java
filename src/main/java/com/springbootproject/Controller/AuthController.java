@@ -1,14 +1,13 @@
 package com.springbootproject.Controller;
 
 import com.springbootproject.Entity.Menu;
-import com.springbootproject.Model.LoginRequest;
-import com.springbootproject.Model.RegisterRequest;
-import com.springbootproject.Model.ResetPasswordRequest;
+import com.springbootproject.Entity.User;
+import com.springbootproject.Model.ApiResponse;
 import com.springbootproject.Service.MenuService;
+import com.springbootproject.Service.UserService;
 import com.springbootproject.Util.JwtUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,21 +15,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    // 直接注入主数据源，用于连接localhost数据库进行验证
+    // 注入用户服务，用于用户验证
     @Autowired
-    private DataSource dataSource;
+    private UserService userService;
     
     // 注入密码编码器，用于密码加密
     @Autowired
@@ -46,80 +42,54 @@ public class AuthController {
 
     // 登录接口
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<?> login(@RequestBody Map<String, Object> loginRequest, HttpServletResponse response) {
         // 从请求对象中获取用户名和密码
-        String username = loginRequest.getUsername();
-        String password = loginRequest.getPassword();
+        String username = (String) loginRequest.get("username");
+        String password = (String) loginRequest.get("password");
         
         // 添加空值检查
         if (loginRequest == null) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", "请求数据不能为空");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error("请求数据不能为空"));
         }
         
         // 验证输入参数
         if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", "用户名和密码不能为空");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error("用户名和密码不能为空"));
         }
         
-        try (Connection connection = dataSource.getConnection();
-             // 直接查询user表，因为数据源已经连接到localhost数据库
-             PreparedStatement stmt = connection.prepareStatement(
-                     "SELECT * FROM user WHERE username = ?")) {
+        try {
+            // 使用 UserService 进行用户验证
+            User user = userService.login(username, password);
             
-            stmt.setString(1, username);
-            ResultSet rs = stmt.executeQuery();
-            
-            if (rs.next()) {                
-                String storedPassword = rs.getString("password");
+            if (user != null) {
+                System.out.println("找到用户，用户名: " + username);
                 
-                // 先尝试BCrypt匹配
-                boolean bCryptMatch = passwordEncoder.matches(password, storedPassword);
+                // 生成JWT令牌
+                String token = jwtUtils.generateToken(username);
+                System.out.println("生成JWT令牌: " + token);
                 
-                // 检查是否为明文密码匹配
-                boolean plainTextMatch = Objects.equals(password, storedPassword);
+                // 将token保存到cookie中
+                Cookie tokenCookie = new Cookie("token", token);
+                tokenCookie.setPath("/");
+                tokenCookie.setMaxAge(7200); // 2小时过期，与JWT token过期时间一致
+                tokenCookie.setHttpOnly(true); // 防止XSS攻击
+                tokenCookie.setSecure(false); // 开发环境使用HTTP，生产环境应设置为true
+                // 使用正确的SameSite常量
+                tokenCookie.setAttribute("SameSite", "Strict");
+                response.addCookie(tokenCookie);
                 
-                boolean passwordMatches = bCryptMatch || plainTextMatch;
+                // 获取用户菜单数据
+                List<Menu> menusTree = menuService.getVisibleMenuTree();
                 
-                if (passwordMatches) {
-                    try {
-                        // 登录成功，生成token并返回
-                        System.out.println("密码验证成功，准备生成token，用户: " + username);
-                        String token = jwtUtils.generateToken(username);
-                        System.out.println("Token生成成功: " + (token != null && token.length() > 0 ? "是" : "否"));
-                        
-                        // 获取用户ID
-                        Long userId = rs.getLong("id");
-                        
-                        // 获取用户的菜单数据（树形结构）
-                        List<Menu> menusTree = menuService.getVisibleMenuTree();
-                        
-                        Map<String, Object> response = new HashMap<>();
-                        response.put("success", true);
-                        response.put("status", "success");
-                        response.put("message", "登录成功");
-                        response.put("username", username);
-                        response.put("userId", userId); // 添加用户ID到响应中
-                        response.put("token", token);
-                        response.put("tokenExpiration", "2小时"); // token过期时间描述
-                        response.put("menus", menusTree); // 添加用户菜单数据
-                        
-                        System.out.println("登录响应准备完成，即将返回");
-                        return ResponseEntity.ok(response);
-                    } catch (Exception e) {
-                        System.out.println("Token生成异常: " + e.getClass().getName());
-                        e.printStackTrace();
-                    }
-                } else {
-                    System.out.println("密码验证失败，用户名: " + username);
-                }
+                // 构建响应数据（不包含token、userId和tokenExpiration）
+                Map<String, Object> responseData = new HashMap<>();
+                responseData.put("username", username);
+                responseData.put("menus", menusTree);
+                
+                System.out.println("登录响应准备完成，即将返回");
+                return ResponseEntity.ok(ApiResponse.success("登录成功", responseData));
+            } else {
+                System.out.println("密码验证失败，用户名: " + username);
             }
         } catch (Exception e) {
             // 记录异常日志
@@ -127,37 +97,24 @@ public class AuthController {
         }
         
         // 登录失败，返回状态码和错误消息
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("status", 400);
-        response.put("message", "用户名或密码错误");
-        
-        return ResponseEntity.badRequest().body(response);
+        return ResponseEntity.badRequest().body(ApiResponse.error("用户名或密码错误"));
     }
     
     // 注册接口
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<?> register(@RequestBody Map<String, Object> registerRequest) {
         // 添加空值检查
         if (registerRequest == null) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", "请求数据不能为空");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error("请求数据不能为空"));
         }
         
         // 从请求对象中获取用户名和密码
-        String username = registerRequest.getUsername();
-        String password = registerRequest.getPassword();
+        String username = (String) registerRequest.get("username");
+        String password = (String) registerRequest.get("password");
         
         // 基本验证
         if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty() || password.length() < 6) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", "用户名不能为空，密码不能为空且长度不能少于6位");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error("用户名不能为空，密码不能为空且长度不能少于6位"));
         }
         
         try {
@@ -165,7 +122,7 @@ public class AuthController {
             boolean usernameExists = false;
             try (Connection connection = dataSource.getConnection();
                  PreparedStatement stmt = connection.prepareStatement(
-                         "SELECT * FROM user WHERE username = ?")) {
+                         "SELECT * FROM users WHERE username = ?")) {
                 
                 stmt.setString(1, username);
                 ResultSet rs = stmt.executeQuery();
@@ -173,85 +130,80 @@ public class AuthController {
             }
             
             if (usernameExists) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("status", 400);
-                response.put("message", "用户名已存在");
-                return ResponseEntity.badRequest().body(response);
+                return ResponseEntity.badRequest().body(ApiResponse.error("用户名已存在"));
             }
             
-            // 对密码进行加密
+            // 密码加密
             String encodedPassword = passwordEncoder.encode(password);
             
-            // 插入新用户
+            // 创建新用户
             try (Connection connection = dataSource.getConnection();
                  PreparedStatement stmt = connection.prepareStatement(
-                         "INSERT INTO user (username, password) VALUES (?, ?)")) {
+                         "INSERT INTO users (username, password, roleId, roleName) VALUES (?, ?, ?, ?)",
+                         PreparedStatement.RETURN_GENERATED_KEYS)) {
                 
                 stmt.setString(1, username);
                 stmt.setString(2, encodedPassword);
-                stmt.executeUpdate();
+                stmt.setLong(3, 2L); // 默认普通用户角色ID，与管理员的1L保持一致
+                stmt.setString(4, "普通用户"); // 默认角色名称
                 
-                // 注册成功，返回状态码和成功消息
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", true);
-                    response.put("status", "success");
-                response.put("message", "注册成功");
-                response.put("username", username);
+                int affectedRows = stmt.executeUpdate();
                 
-                return ResponseEntity.ok(response);
+                if (affectedRows == 0) {
+                    return ResponseEntity.status(500).body(ApiResponse.error("注册失败，无法创建用户"));
+                }
+                
+                // 获取生成的用户ID
+                ResultSet generatedKeys = stmt.getGeneratedKeys();
+                Long userId = null;
+                if (generatedKeys.next()) {
+                    userId = generatedKeys.getLong(1);
+                }
+                
+                // 构建响应数据
+                Map<String, Object> responseData = new HashMap<>();
+                responseData.put("userId", userId);
+                responseData.put("username", username);
+                responseData.put("roleId", 2L);
+                responseData.put("roleName", "普通用户");
+                
+                return ResponseEntity.ok(ApiResponse.success("注册成功", responseData));
             }
         } catch (Exception e) {
             // 记录异常日志
             e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("status", 500);
-            response.put("message", "注册失败，请稍后重试");
-            return ResponseEntity.status(500).body(response);
+            return ResponseEntity.status(500).body(ApiResponse.error("注册失败，请稍后重试"));
         }
     }
     
     // 密码重置接口
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest resetPasswordRequest) {
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, Object> resetPasswordRequest) {
         // 添加空值检查
         if (resetPasswordRequest == null) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", "请求数据不能为空");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error("请求数据不能为空"));
         }
         
         // 从请求对象中获取用户名和新密码
-        String username = resetPasswordRequest.getUsername();
-        String newPassword = resetPasswordRequest.getNewPassword();
+        String username = (String) resetPasswordRequest.get("username");
+        String newPassword = (String) resetPasswordRequest.get("newPassword");
         
         // 基本验证
         if (username == null || username.trim().isEmpty() || newPassword == null || newPassword.trim().isEmpty() || newPassword.length() < 6) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", "用户名不能为空，新密码不能为空且长度不能少于6位");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error("用户名不能为空，新密码不能为空且长度不能少于6位"));
         }
         
         try {
             // 检查用户是否存在
             try (Connection connection = dataSource.getConnection();
                  PreparedStatement stmt = connection.prepareStatement(
-                         "SELECT * FROM user WHERE username = ?")) {
+                         "SELECT * FROM users WHERE username = ?")) {
                 
                 stmt.setString(1, username);
                 ResultSet rs = stmt.executeQuery();
                 
                 if (!rs.next()) {
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("success", false);
-                    response.put("status", 400);
-                    response.put("message", "用户名不存在");
-                    return ResponseEntity.badRequest().body(response);
+                    return ResponseEntity.badRequest().body(ApiResponse.error("用户名不存在"));
                 }
             }
             
@@ -261,7 +213,7 @@ public class AuthController {
             // 更新用户密码
             try (Connection connection = dataSource.getConnection();
                  PreparedStatement stmt = connection.prepareStatement(
-                         "UPDATE user SET password = ? WHERE username = ?")) {
+                         "UPDATE users SET password = ? WHERE username = ?")) {
                 
                 stmt.setString(1, encodedPassword);
                 stmt.setString(2, username);
@@ -269,30 +221,18 @@ public class AuthController {
                 
                 if (rowsAffected > 0) {
                     // 密码重置成功
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("success", true);
-                    response.put("status", "success");
-                    response.put("message", "密码重置成功");
-                    response.put("username", username);
+                    Map<String, Object> responseData = new HashMap<>();
+                    responseData.put("username", username);
                     
-                    return ResponseEntity.ok(response);
+                    return ResponseEntity.ok(ApiResponse.success("密码重置成功", responseData));
                 } else {
-                    // 更新失败
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("success", false);
-                    response.put("status", 500);
-                    response.put("message", "密码重置失败，请稍后重试");
-                    return ResponseEntity.status(500).body(response);
+                    return ResponseEntity.status(500).body(ApiResponse.error("密码重置失败"));
                 }
             }
         } catch (Exception e) {
             // 记录异常日志
             e.printStackTrace();
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("status", 500);
-            response.put("message", "密码重置失败，请稍后重试");
-            return ResponseEntity.status(500).body(response);
+            return ResponseEntity.status(500).body(ApiResponse.error("密码重置失败，请稍后重试"));
         }
     }
 }

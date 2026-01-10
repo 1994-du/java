@@ -18,6 +18,7 @@ import java.nio.file.Paths;
 import java.util.UUID;
 import com.springbootproject.Entity.User;
 import com.springbootproject.Service.UserService;
+import com.springbootproject.Model.ApiResponse;
 import com.springbootproject.Model.AddUserRequest;
 import java.util.HashMap;
 import java.util.List;
@@ -31,23 +32,20 @@ public class UserController {
     
     // 测试认证状态的端点
     @GetMapping("/test-auth")
-    public ResponseEntity<Map<String, Object>> testAuth() {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> testAuth() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         boolean isAuthenticated = authentication != null && authentication.isAuthenticated() && 
                                  !(authentication instanceof AnonymousAuthenticationToken);
         
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("status", "success");
-        response.put("message", "认证状态测试");
-        response.put("isAuthenticated", isAuthenticated);
-        response.put("authentication", authentication != null ? authentication.toString() : "null");
-        response.put("username", isAuthenticated ? authentication.getName() : "未认证");
+        Map<String, Object> data = new HashMap<>();
+        data.put("isAuthenticated", isAuthenticated);
+        data.put("authentication", authentication != null ? authentication.toString() : "null");
+        data.put("username", isAuthenticated ? authentication.getName() : "未认证");
         
         System.out.println("测试认证状态 - 已认证: " + isAuthenticated + ", 用户: " + 
                           (isAuthenticated ? authentication.getName() : "未认证"));
         
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("认证状态测试", data));
     }
 
     @Autowired  // 自动注入 UserService
@@ -73,20 +71,17 @@ public class UserController {
      * 获取当前登录用户信息（需要JWT认证）
      */
     @GetMapping("/me")
-    public ResponseEntity<Map<String, Object>> getCurrentUser() {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getCurrentUser() {
         // 从SecurityContext中获取当前认证的用户信息
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         
         String username = authentication.getName();
         
-        // 构建响应
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("status", "success");
-        response.put("message", "获取当前用户信息成功");
-        response.put("username", username);
+        // 构建响应数据
+        Map<String, Object> data = new HashMap<>();
+        data.put("username", username);
         
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("获取当前用户信息成功", data));
     }
     
     /**
@@ -153,18 +148,12 @@ public class UserController {
             userListWithoutPassword.add(userMap);
         }
         
-        // 构建响应，返回前端需要的从1开始的页码
+        // 构建响应，只保留必要的字段
         Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("status", "success");
-        response.put("message", "获取用户列表成功");
         response.put("data", userListWithoutPassword);
         response.put("total", userPage.getTotalElements());
         response.put("page", page); // 返回前端原始传入的页码
         response.put("pageSize", userPage.getSize());
-        response.put("totalPages", userPage.getTotalPages());
-        response.put("hasNext", userPage.hasNext());
-        response.put("hasPrevious", userPage.hasPrevious());
         
         return ResponseEntity.ok(response);
     }

@@ -1,8 +1,8 @@
 package com.springbootproject.Controller;
 
+import com.springbootproject.Model.ApiResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,8 +28,7 @@ public class RoleController {
      * 从role表中获取所有角色数据
      */
     @GetMapping("/getRoleDict")
-    public ResponseEntity<Map<String, Object>> getRoleDict() {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getRoleDict() {
         List<Map<String, Object>> roleList = new ArrayList<>();
 
         try (Connection connection = dataSource.getConnection();
@@ -51,19 +50,11 @@ public class RoleController {
                 roleList.add(roleMap);
             }
 
-            response.put("success", true);
-            response.put("status", "success");
-            response.put("message", "获取角色字典成功");
-            response.put("data", roleList);
-
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(ApiResponse.success("获取角色字典成功", roleList));
 
         } catch (Exception e) {
             e.printStackTrace();
-            response.put("success", false);
-            response.put("status", 500);
-            response.put("message", "获取角色字典失败: " + e.getMessage());
-            return ResponseEntity.status(500).body(response);
+            return ResponseEntity.status(500).body(ApiResponse.error("获取角色字典失败: " + e.getMessage()));
         }
     }
 }

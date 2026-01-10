@@ -4,14 +4,17 @@ import jakarta.persistence.*;
 
 // 使用JPA注解将User类映射到数据库表
 @Entity
-@Table(name = "user")
+@Table(name = "users")
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String username;
+    
+    @Column(length = 60)
     private String password;
+    
     private String avatar;
     private Long roleId;  // 添加角色ID字段
     private String roleName;  // 添加角色名称字段
