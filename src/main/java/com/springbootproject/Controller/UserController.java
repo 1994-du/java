@@ -90,7 +90,7 @@ public class UserController {
      * 注意：前端传入的page参数是从1开始的，而Spring Data JPA使用从0开始的页码
      */
     @RequestMapping(value = "/all", method = {RequestMethod.GET, RequestMethod.POST})
-    public ResponseEntity<Map<String, Object>> getUsers(
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getUsers(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
             @RequestBody(required = false) Map<String, Object> requestBody) {
@@ -149,13 +149,14 @@ public class UserController {
         }
         
         // 构建响应，只保留必要的字段
-        Map<String, Object> response = new HashMap<>();
-        response.put("data", userListWithoutPassword);
-        response.put("total", userPage.getTotalElements());
-        response.put("page", page); // 返回前端原始传入的页码
-        response.put("pageSize", userPage.getSize());
+        Map<String, Object> responseData = new HashMap<>();
+        responseData.put("list", userListWithoutPassword);
+        responseData.put("total", userPage.getTotalElements());
+        responseData.put("page", page); // 返回前端原始传入的页码
+        responseData.put("pageSize", userPage.getSize());
         
-        return ResponseEntity.ok(response);
+        // 使用统一的ApiResponse格式返回
+        return ResponseEntity.ok(ApiResponse.success("获取用户列表成功", responseData));
     }
     
     /**
@@ -164,9 +165,8 @@ public class UserController {
      * 需要JWT认证
      */
     @PostMapping("/addUser")
-    public ResponseEntity<Map<String, Object>> addUser(@RequestBody AddUserRequest request) {
+    public ResponseEntity<ApiResponse<Map<String, Object>>> addUser(@RequestBody AddUserRequest request) {
         
-        Map<String, Object> response = new HashMap<>();
         String avatarUrl = null;
         
         try {
@@ -175,7 +175,7 @@ public class UserController {
             
             // 验证必要参数
             if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
-                throw new RuntimeException("用户名不能为空");
+                return ResponseEntity.badRequest().body(ApiResponse.error("用户名不能为空"));
             }
             
             // 直接使用前端传来的avatar字符串，不进行处理
@@ -194,22 +194,19 @@ public class UserController {
             // 记录创建的用户信息
             System.out.println("用户创建成功，ID: " + newUser.getId() + ", 角色ID: " + newUser.getRoleId() + ", 角色名称: " + newUser.getRoleName());
             
-            response.put("success", true);
-            response.put("status", "success");
-            response.put("message", "用户创建成功");
-            response.put("data", newUser);
+            // 构建响应数据，不包含密码等敏感信息
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("id", newUser.getId());
+            userData.put("username", newUser.getUsername());
+            userData.put("avatar", newUser.getAvatar());
+            userData.put("roleId", newUser.getRoleId());
+            userData.put("roleName", newUser.getRoleName());
             
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(ApiResponse.success("用户创建成功", userData));
         } catch (RuntimeException e) {
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
-            response.put("success", false);
-            response.put("status", 500);
-            response.put("message", "内部服务器错误: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            return ResponseEntity.internalServerError().body(ApiResponse.error("内部服务器错误: " + e.getMessage()));
         }
     }
     
@@ -273,14 +270,13 @@ public class UserController {
      * 需要JWT认证，通过JSON请求体传递用户ID
      */
     @PostMapping("/deleteUser")
-    public ResponseEntity<Map<String, Object>> deleteUser(@RequestBody Map<String, Object> requestBody) {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseEntity<ApiResponse<Object>> deleteUser(@RequestBody Map<String, Object> requestBody) {
         
         try {
             // 获取用户ID参数
             Object idObj = requestBody.get("id");
             if (idObj == null) {
-                throw new RuntimeException("用户ID不能为空");
+                return ResponseEntity.badRequest().body(ApiResponse.error("用户ID不能为空"));
             }
             
             // 转换ID为Long类型
@@ -290,7 +286,7 @@ public class UserController {
             } else if (idObj instanceof String) {
                 userId = Long.parseLong((String) idObj);
             } else {
-                throw new RuntimeException("用户ID格式不正确");
+                return ResponseEntity.badRequest().body(ApiResponse.error("用户ID格式不正确"));
             }
             
             // 记录删除请求
@@ -299,26 +295,14 @@ public class UserController {
             // 调用服务层删除用户
             userService.deleteUserById(userId);
             
-            response.put("success", true);
-            response.put("status", "success");
-            response.put("message", "用户删除成功");
-            
-            return ResponseEntity.ok(response);
+            // 返回删除成功响应
+            return ResponseEntity.ok(ApiResponse.success("用户删除成功", null));
         } catch (NumberFormatException e) {
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", "用户ID必须是有效的数字");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error("用户ID必须是有效的数字"));
         } catch (RuntimeException e) {
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
-            response.put("success", false);
-            response.put("status", 500);
-            response.put("message", "内部服务器错误: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            return ResponseEntity.internalServerError().body(ApiResponse.error("内部服务器错误: " + e.getMessage()));
         }
     }
     
@@ -327,16 +311,12 @@ public class UserController {
      * 简化版本：只上传文件并返回访问地址，不进行用户关联和其他校验
      */
     @PostMapping("/updateAvatar")
-    public ResponseEntity<Map<String, Object>> updateAvatar(@RequestPart("file") MultipartFile file) {
-        Map<String, Object> response = new HashMap<>();
+    public ResponseEntity<ApiResponse<Map<String, Object>>> updateAvatar(@RequestPart("file") MultipartFile file) {
         
         try {
             // 验证文件是否为空
             if (file.isEmpty()) {
-                response.put("success", false);
-                response.put("status", 400);
-                response.put("message", "上传的文件不能为空");
-                return ResponseEntity.badRequest().body(response);
+                return ResponseEntity.badRequest().body(ApiResponse.error("上传的文件不能为空"));
             }
             
             // 确保上传目录存在
@@ -358,22 +338,15 @@ public class UserController {
             // 构建文件URL
             String avatarUrl = "/uploads/avatars/" + filename;
             
-            response.put("success", true);
-            response.put("status", "success");
-            response.put("message", "文件上传成功");
-            response.put("avatarUrl", avatarUrl);
+            // 构建响应数据
+            Map<String, Object> data = new HashMap<>();
+            data.put("avatarUrl", avatarUrl);
             
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(ApiResponse.success("文件上传成功", data));
         } catch (IOException e) {
-            response.put("success", false);
-            response.put("status", 500);
-            response.put("message", "文件保存失败: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            return ResponseEntity.internalServerError().body(ApiResponse.error("文件保存失败: " + e.getMessage()));
         } catch (Exception e) {
-            response.put("success", false);
-            response.put("status", 500);
-            response.put("message", "文件上传失败: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            return ResponseEntity.internalServerError().body(ApiResponse.error("文件上传失败: " + e.getMessage()));
         }
     }
     
@@ -382,16 +355,11 @@ public class UserController {
      * 接收JSON格式参数，包含id、avatar、username、roleId等字段
      */
     @PostMapping("/setUser")
-    public ResponseEntity<Map<String, Object>> setUser(@RequestBody Map<String, Object> requestBody) {
-        Map<String, Object> response = new HashMap<>();
-        
+    public ResponseEntity<ApiResponse<Object>> setUser(@RequestBody Map<String, Object> requestBody) {
         try {
             // 验证请求体是否包含id字段
             if (!requestBody.containsKey("id") || requestBody.get("id") == null) {
-                response.put("success", false);
-                response.put("status", 400);
-                response.put("message", "用户ID不能为空");
-                return ResponseEntity.badRequest().body(response);
+                return ResponseEntity.badRequest().body(ApiResponse.error("用户ID不能为空"));
             }
             
             // 提取参数
@@ -414,22 +382,11 @@ public class UserController {
             userData.put("roleId", updatedUser.getRoleId());
             userData.put("roleName", updatedUser.getRoleName());
             
-            response.put("success", true);
-            response.put("status", "success");
-            response.put("message", "用户信息更新成功");
-            response.put("data", userData);
-            
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(ApiResponse.success("用户信息更新成功", userData));
         } catch (RuntimeException e) {
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
-            response.put("success", false);
-            response.put("status", 500);
-            response.put("message", "更新用户信息失败: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            return ResponseEntity.internalServerError().body(ApiResponse.error("更新用户信息失败: " + e.getMessage()));
         }
     }
 }

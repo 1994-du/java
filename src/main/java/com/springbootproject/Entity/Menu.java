@@ -9,12 +9,12 @@ import java.util.List;
  * 用于存储系统菜单信息
  */
 @Entity
-@Table(name = "sys_menu")
+@Table(name = "sys_menus")
 public class Menu {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "menu_id", nullable = false)
+    @Column(name = "id", nullable = false)
     private Long menuId;
 
     @Column(name = "parent_id")

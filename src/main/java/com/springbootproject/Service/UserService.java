@@ -42,7 +42,7 @@ public class UserService {
         
         try {
             // 先删除用户角色关联记录
-            jdbcTemplate.update("DELETE FROM user WHERE id = ?", userId);
+            jdbcTemplate.update("DELETE FROM user_role WHERE user_id = ?", userId);
             System.out.println("已删除用户角色关联记录，用户ID: " + userId);
             
             // 再删除用户记录
@@ -116,7 +116,7 @@ public class UserService {
             
             // 尝试查询角色名称
             try {
-                Map<String, Object> roleMap = jdbcTemplate.queryForMap("SELECT id, name FROM role WHERE id = ?", roleId);
+                Map<String, Object> roleMap = jdbcTemplate.queryForMap("SELECT id, name FROM sys_roles WHERE id = ?", roleId);
                 if (roleMap != null) {
                     user.setRoleName((String) roleMap.get("name"));
                 } else {
@@ -166,7 +166,7 @@ public class UserService {
             try {
                 System.out.println("开始查询角色信息，roleId: " + roleId);
                 // 查询角色信息（id和name）
-                roleMap = jdbcTemplate.queryForMap("SELECT id, name FROM role WHERE id = ?", roleId);
+                roleMap = jdbcTemplate.queryForMap("SELECT id, name FROM sys_roles WHERE id = ?", roleId);
                 if (roleMap != null) {
                     System.out.println("找到角色信息: " + roleMap);
                     // 设置角色名称
@@ -218,6 +218,38 @@ public class UserService {
         }
         
         return user;
+    }
+    
+    // 用户注册方法
+    public User register(String username, String password) {
+        // 检查用户名是否已存在
+        if (userRepository.existsByUsername(username)) {
+            throw new RuntimeException("用户名已存在");
+        }
+        
+        // 创建用户对象
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setRoleId(2L); // 默认普通用户角色ID
+        user.setRoleName("普通用户"); // 默认角色名称
+        user.setAvatar("/uploads/avatars/default.jpeg"); // 设置默认头像路径
+        
+        // 保存用户到数据库
+        return userRepository.save(user);
+    }
+    
+    // 密码重置方法
+    public User resetPassword(String username, String newPassword) {
+        // 检查用户是否存在
+        User user = userRepository.findByUsername(username);
+        if (user == null) {
+            throw new RuntimeException("用户名不存在");
+        }
+        
+        // 密码加密并更新
+        user.setPassword(passwordEncoder.encode(newPassword));
+        return userRepository.save(user);
     }
     
     // 重置用户密码为默认密码"123456"（加密）

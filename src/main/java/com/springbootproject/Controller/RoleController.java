@@ -25,14 +25,14 @@ public class RoleController {
 
     /**
      * 获取所有角色字典
-     * 从role表中获取所有角色数据
+     * 从sys_roles表中获取所有角色数据
      */
     @GetMapping("/getRoleDict")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getRoleDict() {
         List<Map<String, Object>> roleList = new ArrayList<>();
 
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement stmt = connection.prepareStatement("SELECT * FROM role")) {
+             PreparedStatement stmt = connection.prepareStatement("SELECT * FROM sys_roles")) {
 
             ResultSet rs = stmt.executeQuery();
 

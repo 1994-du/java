@@ -40,31 +40,22 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // 设置安全配置
+        // 完全禁用安全限制，允许所有请求访问
         http
             .csrf(csrf -> csrf.disable()) // 禁用CSRF保护
             .cors(cors -> cors.disable()) // 禁用CORS限制
-            .exceptionHandling(exception -> exception
-                .authenticationEntryPoint(unauthorizedHandler) // 配置认证失败处理
+            .authorizeHttpRequests(authorize -> authorize
+                // 允许所有请求访问
+                .anyRequest().permitAll()
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS) // 无状态会话
-            )
-            .authorizeHttpRequests(authorize -> authorize
-                // 允许不需要认证的请求
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/public/**").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
-                .requestMatchers("/test-public").permitAll()
-                .requestMatchers("/test-websocket").permitAll()
-                // 其他所有请求都需要认证
-                .anyRequest().authenticated()
             );
 
-        // 注册JWT认证过滤器
-        http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+        // 确保H2控制台能正常访问（如果需要）
+        http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
 
-        System.out.println("安全配置: 已启用JWT认证，仅允许/api/auth/**和/api/public/**路径无需认证");
+        System.out.println("安全配置: 已完全禁用安全限制，允许所有请求访问");
 
         return http.build();
     }

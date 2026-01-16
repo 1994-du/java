@@ -78,13 +78,15 @@ public class AuthController {
                 tokenCookie.setAttribute("SameSite", "Strict");
                 response.addCookie(tokenCookie);
                 
-                // 获取用户菜单数据
-                List<Menu> menusTree = menuService.getVisibleMenuTree();
+                // 根据用户角色ID获取菜单数据
+                List<Menu> menusTree = menuService.getMenusByRoleId(user.getRoleId());
+                System.out.println("获取到的菜单树: " + menusTree);
                 
-                // 构建响应数据（不包含token、userId和tokenExpiration）
+                // 构建响应数据（包含token）
                 Map<String, Object> responseData = new HashMap<>();
                 responseData.put("username", username);
                 responseData.put("menus", menusTree);
+                responseData.put("token", token); // 添加token字段
                 
                 System.out.println("登录响应准备完成，即将返回");
                 return ResponseEntity.ok(ApiResponse.success("登录成功", responseData));
@@ -118,60 +120,23 @@ public class AuthController {
         }
         
         try {
-            // 检查用户名是否已存在
-            boolean usernameExists = false;
-            try (Connection connection = dataSource.getConnection();
-                 PreparedStatement stmt = connection.prepareStatement(
-                         "SELECT * FROM users WHERE username = ?")) {
-                
-                stmt.setString(1, username);
-                ResultSet rs = stmt.executeQuery();
-                usernameExists = rs.next();
-            }
+            // 使用UserService进行注册
+            User newUser = userService.register(username, password);
             
-            if (usernameExists) {
-                return ResponseEntity.badRequest().body(ApiResponse.error("用户名已存在"));
-            }
+            // 构建响应数据
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("userId", newUser.getId());
+            responseData.put("username", newUser.getUsername());
+            responseData.put("roleId", newUser.getRoleId());
+            responseData.put("roleName", newUser.getRoleName());
             
-            // 密码加密
-            String encodedPassword = passwordEncoder.encode(password);
-            
-            // 创建新用户
-            try (Connection connection = dataSource.getConnection();
-                 PreparedStatement stmt = connection.prepareStatement(
-                         "INSERT INTO users (username, password, roleId, roleName) VALUES (?, ?, ?, ?)",
-                         PreparedStatement.RETURN_GENERATED_KEYS)) {
-                
-                stmt.setString(1, username);
-                stmt.setString(2, encodedPassword);
-                stmt.setLong(3, 2L); // 默认普通用户角色ID，与管理员的1L保持一致
-                stmt.setString(4, "普通用户"); // 默认角色名称
-                
-                int affectedRows = stmt.executeUpdate();
-                
-                if (affectedRows == 0) {
-                    return ResponseEntity.status(500).body(ApiResponse.error("注册失败，无法创建用户"));
-                }
-                
-                // 获取生成的用户ID
-                ResultSet generatedKeys = stmt.getGeneratedKeys();
-                Long userId = null;
-                if (generatedKeys.next()) {
-                    userId = generatedKeys.getLong(1);
-                }
-                
-                // 构建响应数据
-                Map<String, Object> responseData = new HashMap<>();
-                responseData.put("userId", userId);
-                responseData.put("username", username);
-                responseData.put("roleId", 2L);
-                responseData.put("roleName", "普通用户");
-                
-                return ResponseEntity.ok(ApiResponse.success("注册成功", responseData));
-            }
+            return ResponseEntity.ok(ApiResponse.success("注册成功", responseData));
         } catch (Exception e) {
             // 记录异常日志
             e.printStackTrace();
+            if (e.getMessage().contains("用户名已存在")) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("用户名已存在"));
+            }
             return ResponseEntity.status(500).body(ApiResponse.error("注册失败，请稍后重试"));
         }
     }
@@ -194,45 +159,36 @@ public class AuthController {
         }
         
         try {
-            // 检查用户是否存在
-            try (Connection connection = dataSource.getConnection();
-                 PreparedStatement stmt = connection.prepareStatement(
-                         "SELECT * FROM users WHERE username = ?")) {
-                
-                stmt.setString(1, username);
-                ResultSet rs = stmt.executeQuery();
-                
-                if (!rs.next()) {
-                    return ResponseEntity.badRequest().body(ApiResponse.error("用户名不存在"));
-                }
-            }
+            // 使用UserService进行密码重置
+            User updatedUser = userService.resetPassword(username, newPassword);
             
-            // 对新密码进行加密
-            String encodedPassword = passwordEncoder.encode(newPassword);
+            // 密码重置成功
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("username", updatedUser.getUsername());
             
-            // 更新用户密码
-            try (Connection connection = dataSource.getConnection();
-                 PreparedStatement stmt = connection.prepareStatement(
-                         "UPDATE users SET password = ? WHERE username = ?")) {
-                
-                stmt.setString(1, encodedPassword);
-                stmt.setString(2, username);
-                int rowsAffected = stmt.executeUpdate();
-                
-                if (rowsAffected > 0) {
-                    // 密码重置成功
-                    Map<String, Object> responseData = new HashMap<>();
-                    responseData.put("username", username);
-                    
-                    return ResponseEntity.ok(ApiResponse.success("密码重置成功", responseData));
-                } else {
-                    return ResponseEntity.status(500).body(ApiResponse.error("密码重置失败"));
-                }
-            }
+            return ResponseEntity.ok(ApiResponse.success("密码重置成功", responseData));
         } catch (Exception e) {
             // 记录异常日志
             e.printStackTrace();
+            if (e.getMessage().contains("用户名不存在")) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("用户名不存在"));
+            }
             return ResponseEntity.status(500).body(ApiResponse.error("密码重置失败，请稍后重试"));
         }
+    }
+    // 退出登录接口
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletResponse response) {
+        // 创建一个同名的cookie，但将其过期时间设置为0，这样浏览器会删除该cookie
+        Cookie tokenCookie = new Cookie("token", null);
+        tokenCookie.setPath("/");
+        tokenCookie.setMaxAge(0); // 设置cookie立即过期
+        tokenCookie.setHttpOnly(true);
+        tokenCookie.setSecure(false);
+        tokenCookie.setAttribute("SameSite", "Strict");
+        response.addCookie(tokenCookie);
+        
+        // 返回退出成功响应
+        return ResponseEntity.ok(ApiResponse.success("退出登录成功", null));
     }
 }

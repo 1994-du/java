@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 
 // 使用JPA注解将User类映射到数据库表
 @Entity
-@Table(name = "users")
+@Table(name = "sys_users")
 public class User {
 
     @Id

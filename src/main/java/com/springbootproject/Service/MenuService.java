@@ -3,6 +3,7 @@ package com.springbootproject.Service;
 import com.springbootproject.Entity.Menu;
 import com.springbootproject.Repository.MenuRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -13,6 +14,9 @@ public class MenuService {
 
     @Autowired
     private MenuRepository menuRepository;
+    
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     /**
      * 获取所有菜单
@@ -214,5 +218,78 @@ public class MenuService {
             return new ArrayList<>();
         }
         return menuRepository.findByNameContaining(keyword);
+    }
+    
+    /**
+     * 根据角色ID获取菜单树
+     * @param roleId 角色ID
+     * @return 树形结构的菜单列表
+     */
+    public List<Menu> getMenusByRoleId(Long roleId) {
+        try {
+            // 检查roleId是否为空
+            if (roleId == null) {
+                return new ArrayList<>();
+            }
+            
+            // 根据角色ID查询sys_roles表，获取menus字段的值
+            Map<String, Object> roleMap = jdbcTemplate.queryForMap("SELECT menus FROM sys_roles WHERE id = ?", roleId);
+            String menusStr = (String) roleMap.get("menus");
+            
+            // 如果menus字段为空或为空字符串，返回空列表
+            if (menusStr == null || menusStr.trim().isEmpty()) {
+                return new ArrayList<>();
+            }
+            
+            // 解析menus字段，获取菜单ID列表
+            List<Long> menuIds = new ArrayList<>();
+            if (menusStr.startsWith("[")) {
+                // JSON格式的菜单ID列表
+                try {
+                    menuIds = new com.fasterxml.jackson.databind.ObjectMapper().readValue(menusStr, new com.fasterxml.jackson.core.type.TypeReference<List<Long>>() {});
+                } catch (Exception e) {
+                    // 如果JSON解析失败，尝试按逗号分隔解析
+                    String[] ids = menusStr.replace("[", "").replace("]", "").split(",");
+                    for (String id : ids) {
+                        try {
+                            menuIds.add(Long.parseLong(id.trim()));
+                        } catch (NumberFormatException ex) {
+                            // 忽略无效的ID
+                        }
+                    }
+                }
+            } else {
+                // 逗号分隔的菜单ID列表
+                String[] ids = menusStr.split(",");
+                for (String id : ids) {
+                    try {
+                        menuIds.add(Long.parseLong(id.trim()));
+                    } catch (NumberFormatException e) {
+                        // 忽略无效的ID
+                    }
+                }
+            }
+            
+            // 如果菜单ID列表为空，返回空列表
+            if (menuIds == null || menuIds.isEmpty()) {
+                return new ArrayList<>();
+            }
+            
+            // 根据菜单ID列表查询sys_menus表，获取菜单信息
+            List<Menu> menus = menuRepository.findAllById(menuIds);
+            
+            // 手动过滤可见且状态正常的菜单，添加menu空值检查
+            List<Menu> visibleMenus = menus.stream()
+                    .filter(menu -> menu != null && menu.getVisible() != null && menu.getVisible() == 1 && menu.getStatus() != null && menu.getStatus() == 1)
+                    .collect(Collectors.toList());
+            
+            // 构建菜单树并返回
+            return buildMenuTree(visibleMenus, 0L);
+        } catch (Exception e) {
+            // 记录异常日志
+            e.printStackTrace();
+            // 如果查询过程中发生异常，返回空列表
+            return new ArrayList<>();
+        }
     }
 }
