@@ -82,11 +82,12 @@ public class AuthController {
                 List<Menu> menusTree = menuService.getMenusByRoleId(user.getRoleId());
                 System.out.println("获取到的菜单树: " + menusTree);
                 
-                // 构建响应数据（包含token）
+                // 构建响应数据（包含token和头像地址）
                 Map<String, Object> responseData = new HashMap<>();
                 responseData.put("username", username);
                 responseData.put("menus", menusTree);
                 responseData.put("token", token); // 添加token字段
+                responseData.put("avatar", user.getAvatar()); // 添加用户头像地址
                 
                 System.out.println("登录响应准备完成，即将返回");
                 return ResponseEntity.ok(ApiResponse.success("登录成功", responseData));

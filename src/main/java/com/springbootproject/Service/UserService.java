@@ -41,11 +41,7 @@ public class UserService {
         }
         
         try {
-            // 先删除用户角色关联记录
-            jdbcTemplate.update("DELETE FROM user_role WHERE user_id = ?", userId);
-            System.out.println("已删除用户角色关联记录，用户ID: " + userId);
-            
-            // 再删除用户记录
+            // 直接删除用户记录
             userRepository.deleteById(userId);
             System.out.println("用户删除成功，用户ID: " + userId);
         } catch (Exception e) {
