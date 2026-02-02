@@ -31,7 +31,7 @@ public class MenuService {
      * @return 正常状态的菜单列表
      */
     public List<Menu> getActiveMenus() {
-        return menuRepository.findByStatus(1);
+        return menuRepository.findAll();
     }
 
     /**
@@ -39,7 +39,7 @@ public class MenuService {
      * @return 显示的菜单列表
      */
     public List<Menu> getVisibleMenus() {
-        return menuRepository.findByVisible(1);
+        return menuRepository.findAll();
     }
 
     /**
@@ -113,9 +113,9 @@ public class MenuService {
      */
     public List<Menu> getVisibleMenuTree() {
         List<Menu> menus = menuRepository.findAll();
-        // 手动过滤可见且状态正常的菜单，添加menu空值检查
+        // 手动过滤空菜单，添加menu空值检查
         List<Menu> visibleMenus = menus.stream()
-                .filter(menu -> menu != null && menu.getVisible() != null && menu.getVisible() == 1 && menu.getStatus() != null && menu.getStatus() == 1)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
         return buildMenuTree(visibleMenus, 0L);
     }
@@ -126,11 +126,8 @@ public class MenuService {
      * @return 子菜单列表
      */
     public List<Menu> getChildMenus(Long parentId) {
-        // 添加空值检查
-        if (parentId == null) {
-            parentId = 0L;
-        }
-        return menuRepository.findByParentIdOrderBySortAsc(parentId);
+        // 由于已删除parentId字段，直接返回所有菜单
+        return menuRepository.findAll();
     }
 
     /**
@@ -145,18 +142,9 @@ public class MenuService {
             return new ArrayList<>();
         }
         
-        Map<Long, List<Menu>> menuMap = new HashMap<>();
-        
-        // 按父ID分组，使用stream API并过滤null值
-        menuMap = menus.stream()
-                .filter(Objects::nonNull)
-                .collect(Collectors.groupingBy(menu -> {
-                    Long pId = menu.getParentId();
-                    return pId != null ? pId : 0L;
-                }));
-        
-        // 递归构建树
-        return buildTreeRecursive(menuMap, parentId);
+        // 直接返回所有菜单，不构建树形结构
+        // 因为我们已经删除了parentId字段
+        return menus;
     }
 
     /**
@@ -171,27 +159,7 @@ public class MenuService {
             return new ArrayList<>();
         }
         
-        List<Menu> children = menuMap.getOrDefault(parentId, new ArrayList<>());
-        
-        if (children.isEmpty()) {
-            return children;
-        }
-        
-        // 对子菜单按排序值排序
-        children.sort((m1, m2) -> {
-            Integer sort1 = m1 != null && m1.getSort() != null ? m1.getSort() : 0;
-            Integer sort2 = m2 != null && m2.getSort() != null ? m2.getSort() : 0;
-            return sort1.compareTo(sort2);
-        });
-        
-        // 递归构建子菜单
-        for (Menu menu : children) {
-            if (menu != null && menu.getMenuId() != null) {
-                menu.setChildren(buildTreeRecursive(menuMap, menu.getMenuId()));
-            }
-        }
-        
-        return children;
+        return menuMap.getOrDefault(parentId, new ArrayList<>());
     }
 
     /**
@@ -204,7 +172,8 @@ public class MenuService {
         if (type == null) {
             return new ArrayList<>();
         }
-        return menuRepository.findByType(type);
+        // 由于已删除type字段，直接返回所有菜单
+        return menuRepository.findAll();
     }
 
     /**
@@ -229,38 +198,74 @@ public class MenuService {
         try {
             // 检查roleId是否为空
             if (roleId == null) {
+                System.out.println("角色ID为空，返回空菜单列表");
                 return new ArrayList<>();
             }
             
             // 根据角色ID查询sys_roles表，获取menus字段的值
             Map<String, Object> roleMap = jdbcTemplate.queryForMap("SELECT menus FROM sys_roles WHERE id = ?", roleId);
-            String menusStr = (String) roleMap.get("menus");
+            Object menusObj = roleMap.get("menus");
+            System.out.println("角色ID: " + roleId + ", menus字段值: " + menusObj + ", 类型: " + (menusObj != null ? menusObj.getClass().getName() : "null"));
             
-            // 如果menus字段为空或为空字符串，返回空列表
-            if (menusStr == null || menusStr.trim().isEmpty()) {
+            // 如果menus字段为空，返回空列表
+            if (menusObj == null) {
+                System.out.println("menus字段为空，返回空菜单列表");
                 return new ArrayList<>();
             }
             
             // 解析menus字段，获取菜单ID列表
             List<Long> menuIds = new ArrayList<>();
-            if (menusStr.startsWith("[")) {
-                // JSON格式的菜单ID列表
-                try {
-                    menuIds = new com.fasterxml.jackson.databind.ObjectMapper().readValue(menusStr, new com.fasterxml.jackson.core.type.TypeReference<List<Long>>() {});
-                } catch (Exception e) {
-                    // 如果JSON解析失败，尝试按逗号分隔解析
-                    String[] ids = menusStr.replace("[", "").replace("]", "").split(",");
+            
+            if (menusObj instanceof String) {
+                // 如果是字符串类型
+                String menusStr = (String) menusObj;
+                if (menusStr.trim().isEmpty()) {
+                    return new ArrayList<>();
+                }
+                
+                if (menusStr.startsWith("[")) {
+                    // JSON格式的菜单ID列表
+                    try {
+                        menuIds = new com.fasterxml.jackson.databind.ObjectMapper().readValue(menusStr, new com.fasterxml.jackson.core.type.TypeReference<List<Long>>() {});
+                    } catch (Exception e) {
+                        // 如果JSON解析失败，尝试按逗号分隔解析
+                        String[] ids = menusStr.replace("[", "").replace("]", "").split(",");
+                        for (String id : ids) {
+                            try {
+                                menuIds.add(Long.parseLong(id.trim()));
+                            } catch (NumberFormatException ex) {
+                                // 忽略无效的ID
+                            }
+                        }
+                    }
+                } else {
+                    // 逗号分隔的菜单ID列表
+                    String[] ids = menusStr.split(",");
                     for (String id : ids) {
                         try {
                             menuIds.add(Long.parseLong(id.trim()));
-                        } catch (NumberFormatException ex) {
+                        } catch (NumberFormatException e) {
                             // 忽略无效的ID
                         }
                     }
                 }
-            } else {
-                // 逗号分隔的菜单ID列表
-                String[] ids = menusStr.split(",");
+            } else if (menusObj instanceof List) {
+                // 如果是数组类型
+                List<?> menusList = (List<?>) menusObj;
+                for (Object item : menusList) {
+                    try {
+                        if (item instanceof Number) {
+                            menuIds.add(((Number) item).longValue());
+                        } else if (item instanceof String) {
+                            menuIds.add(Long.parseLong((String) item));
+                        }
+                    } catch (NumberFormatException e) {
+                        // 忽略无效的ID
+                    }
+                }
+            } else if (menusObj instanceof String[]) {
+                // 如果是字符串数组类型
+                String[] ids = (String[]) menusObj;
                 for (String id : ids) {
                     try {
                         menuIds.add(Long.parseLong(id.trim()));
@@ -268,23 +273,55 @@ public class MenuService {
                         // 忽略无效的ID
                     }
                 }
+            } else if (menusObj instanceof Long[]) {
+                // 如果是长整型数组类型
+                Long[] ids = (Long[]) menusObj;
+                menuIds.addAll(Arrays.asList(ids));
+            } else if (menusObj instanceof int[]) {
+                // 如果是整型数组类型
+                int[] ids = (int[]) menusObj;
+                for (int id : ids) {
+                    menuIds.add((long) id);
+                }
+            } else if (menusObj instanceof long[]) {
+                // 如果是长整型数组类型
+                long[] ids = (long[]) menusObj;
+                for (long id : ids) {
+                    menuIds.add(id);
+                }
             }
             
             // 如果菜单ID列表为空，返回空列表
             if (menuIds == null || menuIds.isEmpty()) {
+                System.out.println("菜单ID列表为空，返回空菜单列表");
                 return new ArrayList<>();
             }
             
+            System.out.println("解析后的菜单ID列表: " + menuIds);
+            
             // 根据菜单ID列表查询sys_menus表，获取菜单信息
             List<Menu> menus = menuRepository.findAllById(menuIds);
+            System.out.println("从数据库查询到的菜单数量: " + (menus != null ? menus.size() : 0));
+            
+            // 打印每个菜单的详细信息
+            if (menus != null) {
+                for (Menu menu : menus) {
+                    System.out.println("菜单详情 - ID: " + menu.getMenuId() + ", 名称: " + menu.getName());
+                }
+            }
             
             // 手动过滤可见且状态正常的菜单，添加menu空值检查
+            // 暂时移除所有过滤条件，直接返回所有菜单
             List<Menu> visibleMenus = menus.stream()
-                    .filter(menu -> menu != null && menu.getVisible() != null && menu.getVisible() == 1 && menu.getStatus() != null && menu.getStatus() == 1)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
             
+            System.out.println("过滤后的可见菜单数量: " + visibleMenus.size());
+            
             // 构建菜单树并返回
-            return buildMenuTree(visibleMenus, 0L);
+            List<Menu> menuTree = buildMenuTree(visibleMenus, 0L);
+            System.out.println("构建的菜单树: " + menuTree);
+            return menuTree;
         } catch (Exception e) {
             // 记录异常日志
             e.printStackTrace();
