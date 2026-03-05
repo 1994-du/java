@@ -24,6 +24,11 @@ public class ApiResponse<T> {
     private T data;
     
     /**
+     * 总条数
+     */
+    private Long total;
+    
+    /**
      * 创建成功响应
      */
     public static <T> ApiResponse<T> success(String message, T data) {
@@ -31,6 +36,15 @@ public class ApiResponse<T> {
         response.setCode(200);
         response.setMsg(message);
         response.setData(data);
+        return response;
+    }
+    
+    /**
+     * 创建成功响应（带总条数）
+     */
+    public static <T> ApiResponse<T> success(String message, T data, Long total) {
+        ApiResponse<T> response = success(message, data);
+        response.setTotal(total);
         return response;
     }
     

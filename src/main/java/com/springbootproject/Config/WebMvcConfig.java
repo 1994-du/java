@@ -2,11 +2,12 @@ package com.springbootproject.Config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * WebMvc配置类，用于配置静态资源访问
+ * WebMvc配置类，用于配置静态资源访问和跨域请求
  */
 @Configuration
 public class WebMvcConfig {
@@ -19,6 +20,17 @@ public class WebMvcConfig {
                 // 允许访问上传的文件
                 registry.addResourceHandler("/uploads/**")
                         .addResourceLocations("file:uploads/");
+            }
+
+            @Override
+            public void addCorsMappings(CorsRegistry registry) {
+                // 配置跨域请求
+                registry.addMapping("/**")
+                        .allowedOrigins("http://106.15.207.57")
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        .allowedHeaders("*")
+                        .allowCredentials(true)
+                        .maxAge(3600);
             }
         };
     }

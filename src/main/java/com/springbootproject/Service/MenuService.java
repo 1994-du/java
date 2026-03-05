@@ -23,7 +23,13 @@ public class MenuService {
      * @return 菜单列表
      */
     public List<Menu> getAllMenus() {
-        return menuRepository.findAll();
+        List<Menu> menus = menuRepository.findAll();
+        // 打印所有菜单数据，以便检查是否存在id为2的子菜单
+        System.out.println("All menus:");
+        for (Menu menu : menus) {
+            System.out.println("Menu: id=" + menu.getId() + ", name=" + menu.getName() + ", parentId=" + menu.getParentId());
+        }
+        return menus;
     }
 
     /**
@@ -126,8 +132,12 @@ public class MenuService {
      * @return 子菜单列表
      */
     public List<Menu> getChildMenus(Long parentId) {
-        // 由于已删除parentId字段，直接返回所有菜单
-        return menuRepository.findAll();
+        // 添加空值检查
+        final Long finalParentId = (parentId == null) ? 0L : parentId;
+        // 使用JPA查询根据parentId获取子菜单
+        return menuRepository.findAll().stream()
+                .filter(menu -> menu.getParentId() != null && menu.getParentId().equals(finalParentId))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -136,15 +146,69 @@ public class MenuService {
      * @param parentId 父菜单ID
      * @return 树形结构的菜单列表
      */
-    private List<Menu> buildMenuTree(List<Menu> menus, Long parentId) {
+    public List<Menu> buildMenuTree(List<Menu> menus, Long parentId) {
         // 添加空值检查
         if (menus == null) {
             return new ArrayList<>();
         }
         
-        // 直接返回所有菜单，不构建树形结构
-        // 因为我们已经删除了parentId字段
-        return menus;
+        List<Menu> result = new ArrayList<>();
+        
+        for (Menu menu : menus) {
+            // 处理parentId为NULL的情况，将其作为根菜单
+            if (menu.getParentId() == null && parentId == 0L) {
+                // 构建子菜单
+                List<Menu> children = new ArrayList<>();
+                for (Menu childMenu : menus) {
+                    if (childMenu.getParentId() != null) {
+                        try {
+                            long childParentId = childMenu.getParentId().longValue();
+                            long menuId = menu.getId().longValue();
+                            System.out.println("Comparing childParentId: " + childParentId + " with menuId: " + menuId);
+                            if (childParentId == menuId) {
+                                // 递归构建子菜单的子菜单
+                                List<Menu> grandChildren = buildMenuTree(menus, childMenu.getId());
+                                childMenu.setChildren(grandChildren.isEmpty() ? null : grandChildren);
+                                children.add(childMenu);
+                                System.out.println("Added child menu: " + childMenu.getName() + " to parent: " + menu.getName());
+                            }
+                        } catch (Exception e) {
+                            System.out.println("Error comparing parentId: " + e.getMessage());
+                        }
+                    }
+                }
+                menu.setChildren(children.isEmpty() ? null : children);
+                result.add(menu);
+                System.out.println("Added root menu: " + menu.getName() + " with " + children.size() + " children");
+            } else if (menu.getParentId() != null) {
+                try {
+                    long menuParentId = menu.getParentId().longValue();
+                    long parentIdValue = parentId.longValue();
+                    if (menuParentId == parentIdValue) {
+                        // 构建子菜单
+                        List<Menu> children = new ArrayList<>();
+                        for (Menu childMenu : menus) {
+                            if (childMenu.getParentId() != null) {
+                                long childParentId = childMenu.getParentId().longValue();
+                                long menuId = menu.getId().longValue();
+                                if (childParentId == menuId) {
+                                    // 递归构建子菜单的子菜单
+                                    List<Menu> grandChildren = buildMenuTree(menus, childMenu.getId());
+                                    childMenu.setChildren(grandChildren.isEmpty() ? null : grandChildren);
+                                    children.add(childMenu);
+                                }
+                            }
+                        }
+                        menu.setChildren(children.isEmpty() ? null : children);
+                        result.add(menu);
+                    }
+                } catch (Exception e) {
+                    System.out.println("Error comparing parentId: " + e.getMessage());
+                }
+            }
+        }
+        
+        return result;
     }
 
     /**
@@ -306,7 +370,7 @@ public class MenuService {
             // 打印每个菜单的详细信息
             if (menus != null) {
                 for (Menu menu : menus) {
-                    System.out.println("菜单详情 - ID: " + menu.getMenuId() + ", 名称: " + menu.getName());
+                    System.out.println("菜单详情 - ID: " + menu.getId() + ", 名称: " + menu.getName());
                 }
             }
             
