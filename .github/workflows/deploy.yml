@@ -26,7 +26,7 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
 
       - name: build jar
-        run: mvn clean package -DskipTests && mv target/*.jar target/springBootProject.jar
+        run: mvn clean package -DskipTests
 
       - name: upload to server
         uses: appleboy/scp-action@master
@@ -34,7 +34,7 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "target/springBootProject.jar"
+          source: "target/*.jar"
           target: "/root/"
 
       - name: restart service
@@ -44,5 +44,5 @@ jobs:
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            ps -ef | grep springBootProject | grep -v grep | awk '{print $2}' | xargs kill -9 || true
-            nohup java -jar /root/*.jar > app.log 2>&1 &
+            pkill -f springBootProject.jar || true
+            nohup java -jar /root/springBootProject.jar > app.log 2>&1 &
