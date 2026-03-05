@@ -36,6 +36,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           source: "target/*.jar"
           target: "/root/"
+          strip_components: 1
 
       - name: restart service
         uses: appleboy/ssh-action@master
