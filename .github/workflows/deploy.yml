@@ -44,5 +44,5 @@ jobs:
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            ps -ef | grep springBootProject | grep -v grep | awk '{print $2}' | xargs kill -9
-            nohup java -jar /root/*.jar" > app.log 2>&1 &
+            ps -ef | grep springBootProject | grep -v grep | awk '{print $2}' | xargs kill -9 || true
+            nohup java -jar /root/*.jar > app.log 2>&1 &
