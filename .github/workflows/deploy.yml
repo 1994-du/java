@@ -19,6 +19,12 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: cache maven
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+
       - name: build jar
         run: mvn clean package -DskipTests && mv target/*.jar target/springBootProject.jar
 
@@ -38,4 +44,5 @@ jobs:
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            systemctl restart springboot
+            pkill -f springBootProject || true
+            nohup java -jar /root/springBootProject.jar > app.log 2>&1 &
