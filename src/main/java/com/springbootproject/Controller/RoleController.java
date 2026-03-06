@@ -212,4 +212,96 @@ public class RoleController {
             return ResponseEntity.status(500).body(ApiResponse.error("更新角色失败: " + e.getMessage()));
         }
     }
+
+    /**
+     * 添加角色
+     * @param roleData 角色数据，包含角色名称等字段
+     * @return 添加结果
+     */
+    @PostMapping("/addRole")
+    public ResponseEntity<ApiResponse<Object>> addRole(@RequestBody Map<String, Object> roleData) {
+        try {
+            if (!roleData.containsKey("name") || roleData.get("name") == null || roleData.get("name").toString().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("角色名称不能为空"));
+            }
+
+            String name = roleData.get("name").toString();
+            String roleDesc = roleData.containsKey("roleDesc") && roleData.get("roleDesc") != null ? roleData.get("roleDesc").toString() : null;
+            String menusJson = "[]";
+
+            if (roleData.containsKey("menus") && roleData.get("menus") != null) {
+                try {
+                    List<Integer> menusList = (List<Integer>) roleData.get("menus");
+                    menusJson = objectMapper.writeValueAsString(menusList);
+                } catch (Exception e) {
+                    System.out.println("转换menus字段失败: " + roleData.get("menus"));
+                    return ResponseEntity.badRequest().body(ApiResponse.error("menus字段格式错误"));
+                }
+            }
+
+            String sql = "INSERT INTO sys_roles (name, roleDesc, menus) VALUES (?, ?, ?)";
+
+            try (Connection connection = dataSource.getConnection();
+                 PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+                stmt.setString(1, name);
+                stmt.setString(2, roleDesc);
+                stmt.setString(3, menusJson);
+
+                int rowsAffected = stmt.executeUpdate();
+                if (rowsAffected > 0) {
+                    return ResponseEntity.ok(ApiResponse.success("添加角色成功", null));
+                } else {
+                    return ResponseEntity.status(500).body(ApiResponse.error("添加角色失败"));
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseEntity.status(500).body(ApiResponse.error("添加角色失败: " + e.getMessage()));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ApiResponse.error("添加角色失败: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 删除角色
+     * @param roleData 角色数据，包含角色ID
+     * @return 删除结果
+     */
+    @PostMapping("/delRole")
+    public ResponseEntity<ApiResponse<Object>> delRole(@RequestBody Map<String, Object> roleData) {
+        try {
+            if (!roleData.containsKey("id") || roleData.get("id") == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("角色ID不能为空"));
+            }
+
+            Long id = Long.valueOf(roleData.get("id").toString());
+
+            String sql = "DELETE FROM sys_roles WHERE id = ?";
+
+            try (Connection connection = dataSource.getConnection();
+                 PreparedStatement stmt = connection.prepareStatement(sql)) {
+
+                stmt.setLong(1, id);
+
+                int rowsAffected = stmt.executeUpdate();
+                if (rowsAffected > 0) {
+                    return ResponseEntity.ok(ApiResponse.success("删除角色成功", null));
+                } else {
+                    return ResponseEntity.badRequest().body(ApiResponse.error("角色不存在"));
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseEntity.status(500).body(ApiResponse.error("删除角色失败: " + e.getMessage()));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ApiResponse.error("删除角色失败: " + e.getMessage()));
+        }
+    }
 }
