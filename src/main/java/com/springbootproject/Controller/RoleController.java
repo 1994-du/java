@@ -24,7 +24,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 public class RoleController {
-
     @Autowired
     private DataSource dataSource;
 
