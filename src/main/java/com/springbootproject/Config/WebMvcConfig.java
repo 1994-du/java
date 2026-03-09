@@ -1,5 +1,6 @@
 package com.springbootproject.Config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
@@ -12,14 +13,16 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebMvcConfig {
 
+    @Value("${app.upload.path}")
+    private String uploadPath;
+
     @Bean
     public WebMvcConfigurer webMvcConfigurer() {
         return new WebMvcConfigurer() {
             @Override
             public void addResourceHandlers(ResourceHandlerRegistry registry) {
-                // 允许访问上传的文件
                 registry.addResourceHandler("/uploads/**")
-                        .addResourceLocations("file:uploads/");
+                        .addResourceLocations("file:" + uploadPath);
             }
 
             @Override
