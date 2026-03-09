@@ -147,7 +147,6 @@ public class MenuService {
      * @return 树形结构的菜单列表
      */
     public List<Menu> buildMenuTree(List<Menu> menus, Long parentId) {
-        // 添加空值检查
         if (menus == null) {
             return new ArrayList<>();
         }
@@ -155,59 +154,24 @@ public class MenuService {
         List<Menu> result = new ArrayList<>();
         
         for (Menu menu : menus) {
-            // 处理parentId为NULL的情况，将其作为根菜单
-            if (menu.getParentId() == null && parentId == 0L) {
-                // 构建子菜单
-                List<Menu> children = new ArrayList<>();
-                for (Menu childMenu : menus) {
-                    if (childMenu.getParentId() != null) {
-                        try {
-                            long childParentId = childMenu.getParentId().longValue();
-                            long menuId = menu.getId().longValue();
-                            System.out.println("Comparing childParentId: " + childParentId + " with menuId: " + menuId);
-                            if (childParentId == menuId) {
-                                // 递归构建子菜单的子菜单
-                                List<Menu> grandChildren = buildMenuTree(menus, childMenu.getId());
-                                childMenu.setChildren(grandChildren.isEmpty() ? null : grandChildren);
-                                children.add(childMenu);
-                                System.out.println("Added child menu: " + childMenu.getName() + " to parent: " + menu.getName());
-                            }
-                        } catch (Exception e) {
-                            System.out.println("Error comparing parentId: " + e.getMessage());
-                        }
-                    }
-                }
+            Long menuParentId = menu.getParentId();
+            boolean isMatch = false;
+            
+            if (parentId == 0L && menuParentId == null) {
+                isMatch = true;
+            } else if (parentId != 0L && menuParentId != null && menuParentId.equals(parentId)) {
+                isMatch = true;
+            }
+            
+            if (isMatch) {
+                List<Menu> children = buildMenuTree(menus, menu.getId());
+                children.sort(Comparator.comparingInt(m -> m.getSort() != null ? m.getSort() : 0));
                 menu.setChildren(children.isEmpty() ? null : children);
                 result.add(menu);
-                System.out.println("Added root menu: " + menu.getName() + " with " + children.size() + " children");
-            } else if (menu.getParentId() != null) {
-                try {
-                    long menuParentId = menu.getParentId().longValue();
-                    long parentIdValue = parentId.longValue();
-                    if (menuParentId == parentIdValue) {
-                        // 构建子菜单
-                        List<Menu> children = new ArrayList<>();
-                        for (Menu childMenu : menus) {
-                            if (childMenu.getParentId() != null) {
-                                long childParentId = childMenu.getParentId().longValue();
-                                long menuId = menu.getId().longValue();
-                                if (childParentId == menuId) {
-                                    // 递归构建子菜单的子菜单
-                                    List<Menu> grandChildren = buildMenuTree(menus, childMenu.getId());
-                                    childMenu.setChildren(grandChildren.isEmpty() ? null : grandChildren);
-                                    children.add(childMenu);
-                                }
-                            }
-                        }
-                        menu.setChildren(children.isEmpty() ? null : children);
-                        result.add(menu);
-                    }
-                } catch (Exception e) {
-                    System.out.println("Error comparing parentId: " + e.getMessage());
-                }
             }
         }
         
+        result.sort(Comparator.comparingInt(m -> m.getSort() != null ? m.getSort() : 0));
         return result;
     }
 
