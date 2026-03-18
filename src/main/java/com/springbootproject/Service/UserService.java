@@ -34,6 +34,11 @@ public class UserService {
         return userRepository.findByUsername(username);
     }
     
+    // 用于AuthController中的方法名
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+    
     // 根据ID删除用户
     public void deleteUserById(Long userId) {
         if (!userRepository.existsById(userId)) {

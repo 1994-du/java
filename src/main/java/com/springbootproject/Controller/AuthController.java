@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.Map;
@@ -191,5 +192,53 @@ public class AuthController {
         
         // 返回退出成功响应
         return ResponseEntity.ok(ApiResponse.success("退出登录成功", null));
+    }
+    
+    // 获取当前用户菜单接口
+    @PostMapping("/getMenus")
+    public ResponseEntity<?> getMenus(HttpServletRequest request) {
+        try {
+            // 从cookie中获取token
+            String token = null;
+            Cookie[] cookies = request.getCookies();
+            if (cookies != null) {
+                for (Cookie cookie : cookies) {
+                    if ("token".equals(cookie.getName())) {
+                        token = cookie.getValue();
+                        break;
+                    }
+                }
+            }
+            
+            if (token == null || token.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("未登录或token已过期"));
+            }
+            
+            // 解析token获取用户名
+            String username = jwtUtils.getUsernameFromToken(token);
+            if (username == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("token无效"));
+            }
+            
+            // 获取用户信息
+            User user = userService.findByUsername(username);
+            if (user == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("用户不存在"));
+            }
+            
+            // 根据用户角色ID获取菜单数据
+            List<Menu> menusTree = menuService.getMenusByRoleId(user.getRoleId());
+            
+            // 构建响应数据
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("menus", menusTree);
+            responseData.put("username", user.getUsername());
+            responseData.put("avatar", user.getAvatar());
+            
+            return ResponseEntity.ok(ApiResponse.success("获取菜单成功", responseData));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ApiResponse.error("获取菜单失败: " + e.getMessage()));
+        }
     }
 }
