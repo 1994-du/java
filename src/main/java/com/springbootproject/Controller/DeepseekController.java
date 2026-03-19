@@ -25,7 +25,6 @@ public class DeepseekController {
             if (message == null || message.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(ApiResponse.error("消息内容不能为空"));
             }
-
             String response = deepseekService.callDeepseek(message);
             return ResponseEntity.ok(ApiResponse.success("调用成功", response));
         } catch (Exception e) {
