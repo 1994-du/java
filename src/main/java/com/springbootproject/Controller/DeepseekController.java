@@ -14,7 +14,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/deepseek")
 public class DeepseekController {
-
     @Autowired
     private DeepseekService deepseekService;
     @PostMapping("/chat")
