@@ -45,4 +45,10 @@ jobs:
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            systemctl restart springboot
+            systemctl stop springboot || true
+            pkill -f 'springBootProject-0.0.1-SNAPSHOT.jar' || true
+            sleep 2
+            systemctl start springboot
+            sleep 5
+            systemctl status springboot --no-pager -l
+            ps -ef | grep springBootProject | grep -v grep
