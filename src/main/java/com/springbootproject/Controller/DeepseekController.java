@@ -17,7 +17,6 @@ public class DeepseekController {
 
     @Autowired
     private DeepseekService deepseekService;
-
     @PostMapping("/chat")
     public ResponseEntity<?> chat(@RequestBody Map<String, Object> request) {
         try {
