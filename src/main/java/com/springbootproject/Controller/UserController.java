@@ -145,6 +145,7 @@ public class UserController {
             userMap.put("avatar", user.getAvatar());
             userMap.put("roleId", user.getRoleId());
             userMap.put("roleName", user.getRoleName());
+            userMap.put("gender", user.getGender());
             userListWithoutPassword.add(userMap);
         }
         
@@ -189,7 +190,8 @@ public class UserController {
                     request.getUsername(), 
                     null, // 密码参数为null
                     avatarUrl, 
-                    request.getRoleId());
+                    request.getRoleId(),
+                    request.getGender());
             
             // 记录创建的用户信息
             System.out.println("用户创建成功，ID: " + newUser.getId() + ", 角色ID: " + newUser.getRoleId() + ", 角色名称: " + newUser.getRoleName());
@@ -201,6 +203,7 @@ public class UserController {
             userData.put("avatar", newUser.getAvatar());
             userData.put("roleId", newUser.getRoleId());
             userData.put("roleName", newUser.getRoleName());
+            userData.put("gender", newUser.getGender());
             
             return ResponseEntity.ok(ApiResponse.success("用户创建成功", userData));
         } catch (RuntimeException e) {
@@ -240,6 +243,7 @@ public class UserController {
             userData.put("avatar", updatedUser.getAvatar());
             userData.put("roleId", updatedUser.getRoleId());
             userData.put("roleName", updatedUser.getRoleName());
+            userData.put("gender", updatedUser.getGender());
             
             response.put("success", true);
             response.put("status", "success");
@@ -366,13 +370,14 @@ public class UserController {
             Long id = Long.parseLong(requestBody.get("id").toString());
             String avatar = requestBody.containsKey("avatar") ? (String) requestBody.get("avatar") : null;
             String username = requestBody.containsKey("username") ? (String) requestBody.get("username") : null;
+            String gender = requestBody.containsKey("gender") ? (String) requestBody.get("gender") : null;
             Long roleId = null;
             if (requestBody.containsKey("roleId") && requestBody.get("roleId") != null) {
                 roleId = Long.parseLong(requestBody.get("roleId").toString());
             }
             
             // 调用UserService更新用户信息
-            User updatedUser = userService.updateUser(id, username, avatar, roleId);
+            User updatedUser = userService.updateUser(id, username, avatar, roleId, gender);
             
             // 构建响应数据，不包含密码
             Map<String, Object> userData = new HashMap<>();

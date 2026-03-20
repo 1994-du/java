@@ -112,9 +112,10 @@ public class AuthController {
             return ResponseEntity.badRequest().body(ApiResponse.error("请求数据不能为空"));
         }
         
-        // 从请求对象中获取用户名和密码
+        // 从请求对象中获取用户名、密码和性别
         String username = (String) registerRequest.get("username");
         String password = (String) registerRequest.get("password");
+        String gender = (String) registerRequest.get("gender");
         
         // 基本验证
         if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty() || password.length() < 6) {
@@ -123,7 +124,7 @@ public class AuthController {
         
         try {
             // 使用UserService进行注册
-            User newUser = userService.register(username, password);
+            User newUser = userService.register(username, password, gender);
             
             // 构建响应数据
             Map<String, Object> responseData = new HashMap<>();

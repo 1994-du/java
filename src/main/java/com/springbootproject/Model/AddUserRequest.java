@@ -8,6 +8,7 @@ public class AddUserRequest {
     private String username;
     private Long roleId;     // 可选
     private String avatar;   // 可选，用于接收头像的字符串
+    private String gender;   // 可选，性别
 
     // Getters and Setters
     public String getUsername() {
@@ -32,5 +33,13 @@ public class AddUserRequest {
 
     public void setAvatar(String avatar) {
         this.avatar = avatar;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
     }
 }

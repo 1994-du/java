@@ -18,6 +18,7 @@ public class User {
     private String avatar;
     private Long roleId;  // 添加角色ID字段
     private String roleName;  // 添加角色名称字段
+    private String gender;  // 添加性别字段
 
     // Getters and setters
     public Long getId() {
@@ -66,5 +67,13 @@ public class User {
 
     public void setRoleName(String roleName) {
         this.roleName = roleName;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
     }
 }

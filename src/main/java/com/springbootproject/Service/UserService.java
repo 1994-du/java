@@ -89,7 +89,7 @@ public class UserService {
     }
     
     // 更新用户信息
-    public User updateUser(Long id, String username, String avatar, Long roleId) {
+    public User updateUser(Long id, String username, String avatar, Long roleId, String gender) {
         // 根据ID查找用户
         User user = userRepository.findById(id).orElse(null);
         if (user == null) {
@@ -109,6 +109,11 @@ public class UserService {
         // 更新头像（如果提供）
         if (avatar != null) {
             user.setAvatar(avatar);
+        }
+        
+        // 更新性别（如果提供）
+        if (gender != null) {
+            user.setGender(gender);
         }
         
         // 更新角色ID和角色名称（如果提供）
@@ -134,7 +139,7 @@ public class UserService {
     }
     
     // 创建用户（包含头像和角色）
-    public User createUserWithAvatarAndRole(String username, String password, String avatarUrl, Long roleId) {
+    public User createUserWithAvatarAndRole(String username, String password, String avatarUrl, Long roleId, String gender) {
         // 检查用户名是否已存在
         if (userRepository.existsByUsername(username)) {
             throw new RuntimeException("用户名已存在");
@@ -149,6 +154,11 @@ public class UserService {
         
         if (avatarUrl != null && !avatarUrl.isEmpty()) {
             user.setAvatar(avatarUrl);
+        }
+        
+        // 设置性别
+        if (gender != null) {
+            user.setGender(gender);
         }
         
         // 角色相关信息
@@ -192,18 +202,18 @@ public class UserService {
         }
         
         // 保存用户到数据库前，打印用户对象信息
-        System.out.println("保存前的用户对象: id=" + user.getId() + ", roleId=" + user.getRoleId() + ", roleName=" + user.getRoleName());
+        System.out.println("保存前的用户对象: id=" + user.getId() + ", roleId=" + user.getRoleId() + ", roleName=" + user.getRoleName() + ", gender=" + user.getGender());
         
         // 先保存用户到数据库，获取用户ID
         user = userRepository.save(user);
         
         // 保存后再次打印用户对象信息，确认角色信息是否正确保存
-        System.out.println("保存后的用户对象: id=" + user.getId() + ", roleId=" + user.getRoleId() + ", roleName=" + user.getRoleName());
+        System.out.println("保存后的用户对象: id=" + user.getId() + ", roleId=" + user.getRoleId() + ", roleName=" + user.getRoleName() + ", gender=" + user.getGender());
         
         // 尝试从数据库重新加载用户，验证角色信息是否持久化
         User reloadedUser = userRepository.findById(user.getId()).orElse(null);
         if (reloadedUser != null) {
-            System.out.println("从数据库重新加载的用户: roleId=" + reloadedUser.getRoleId() + ", roleName=" + reloadedUser.getRoleName());
+            System.out.println("从数据库重新加载的用户: roleId=" + reloadedUser.getRoleId() + ", roleName=" + reloadedUser.getRoleName() + ", gender=" + reloadedUser.getGender());
         }
         
         // 用户保存成功后，如果有角色信息，插入用户角色关联记录
@@ -222,7 +232,7 @@ public class UserService {
     }
     
     // 用户注册方法
-    public User register(String username, String password) {
+    public User register(String username, String password, String gender) {
         // 检查用户名是否已存在
         if (userRepository.existsByUsername(username)) {
             throw new RuntimeException("用户名已存在");
@@ -235,6 +245,7 @@ public class UserService {
         user.setRoleId(2L); // 默认普通用户角色ID
         user.setRoleName("普通用户"); // 默认角色名称
         user.setAvatar("/uploads/avatars/default.jpeg"); // 设置默认头像路径
+        user.setGender(gender); // 设置性别
         
         // 保存用户到数据库
         return userRepository.save(user);
