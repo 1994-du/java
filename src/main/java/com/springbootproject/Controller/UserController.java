@@ -1,5 +1,6 @@
 package com.springbootproject.Controller;
 
+import com.springbootproject.Service.UploadStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -14,7 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 import com.springbootproject.Entity.User;
 import com.springbootproject.Service.UserService;
@@ -50,6 +51,9 @@ public class UserController {
 
     @Autowired  // 自动注入 UserService
     private UserService userService;
+
+    @Autowired
+    private UploadStorageService uploadStorageService;
 
     // 通过用户名获取用户信息（需要JWT认证）
     @GetMapping("/{username}")
@@ -322,25 +326,29 @@ public class UserController {
             if (file.isEmpty()) {
                 return ResponseEntity.badRequest().body(ApiResponse.error("上传的文件不能为空"));
             }
-            
-            // 确保上传目录存在
-            String uploadDir = "uploads/avatars/";
-            Path uploadPath = Paths.get(uploadDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
+
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename == null || !originalFilename.contains(".")) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("文件名不合法"));
+            }
+
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("仅支持图片文件"));
             }
             
+            Path uploadPath = uploadStorageService.getAvatarDir();
+            
             // 生成唯一文件名
-            String originalFilename = file.getOriginalFilename();
             String fileExtension = originalFilename.substring(originalFilename.lastIndexOf('.'));
             String filename = UUID.randomUUID().toString() + fileExtension;
             
             // 保存文件
             Path filePath = uploadPath.resolve(filename);
-            Files.write(filePath, file.getBytes());
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
             
             // 构建文件URL
-            String avatarUrl = "/uploads/avatars/" + filename;
+            String avatarUrl = uploadStorageService.buildAvatarUrl(filename);
             
             // 构建响应数据
             Map<String, Object> data = new HashMap<>();

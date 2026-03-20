@@ -1,18 +1,17 @@
 package com.springbootproject.Controller;
 
+import com.springbootproject.Service.UploadStorageService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,14 +20,13 @@ import java.util.Map;
 @RequestMapping("/api/file")
 public class FileUploadController {
 
-    // 文件上传目录 - 使用绝对路径确保稳定性
-    private static final String UPLOAD_DIR = System.getProperty("user.dir") + File.separator + "uploads" + File.separator + "files";
-    // 文件访问基础路径
-    private static final String BASE_URL = "/uploads/files/";
     // 最大文件大小 (5MB)
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
     // 允许的文件类型
     private static final String[] ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx", ".txt"};
+
+    @Autowired
+    private UploadStorageService uploadStorageService;
 
     @PostMapping("/upload")
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
@@ -65,28 +63,18 @@ public class FileUploadController {
                 return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
             }
 
-            // 创建上传目录（如果不存在）
-            File uploadDir = new File(UPLOAD_DIR);
-            if (!uploadDir.exists()) {
-                boolean created = uploadDir.mkdirs();
-                System.out.println("创建上传目录: " + UPLOAD_DIR + ", 结果: " + created);
-                if (!created && !uploadDir.exists()) {
-                    response.put("status", "error");
-                    response.put("message", "创建上传目录失败: " + UPLOAD_DIR);
-                    return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
-                }
-            }
-            System.out.println("上传目录存在: " + uploadDir.exists() + ", 可写: " + uploadDir.canWrite());
+            Path uploadDir = uploadStorageService.getFilesDir();
+            System.out.println("上传目录存在: " + uploadDir + ", 可写: " + java.nio.file.Files.isWritable(uploadDir));
 
             // 生成唯一文件名
             String uniqueFilename = generateUniqueFilename(fileExtension);
-            String filePath = UPLOAD_DIR + File.separator + uniqueFilename;
+            Path filePath = uploadDir.resolve(uniqueFilename);
 
             // 保存文件
-            file.transferTo(new File(filePath));
+            file.transferTo(filePath.toFile());
 
             // 构建文件访问URL
-            String fileUrl = BASE_URL + uniqueFilename;
+            String fileUrl = uploadStorageService.buildFileUrl(uniqueFilename);
 
             // 返回成功响应
             response.put("status", "success");
