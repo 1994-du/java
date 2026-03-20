@@ -16,7 +16,6 @@ import java.util.stream.Stream;
 @Service
 public class UploadStorageService {
 
-    private static final Path ROOT_UPLOAD_DIR = Paths.get("/root/uploads");
     private static final Path LEGACY_SHARED_UPLOAD_ROOT = Paths.get("/uploads");
 
     @Value("${app.upload.base-dir:}")
@@ -65,7 +64,7 @@ public class UploadStorageService {
             return Paths.get(configuredBaseDir).toAbsolutePath().normalize();
         }
 
-        return ROOT_UPLOAD_DIR;
+        return Paths.get(System.getProperty("user.dir"), "uploads").toAbsolutePath().normalize();
     }
 
     private void migrateLegacyDirectory(Path legacyUploadDir) throws IOException {
