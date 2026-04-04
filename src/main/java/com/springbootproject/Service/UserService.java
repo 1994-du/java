@@ -77,6 +77,11 @@ public class UserService {
         return userRepository.findAll(pageable);
     }
     
+    // 根据用户名模糊搜索用户
+    public List<User> searchByUsername(String username) {
+        return userRepository.findByUsernameContaining(username);
+    }
+    
     // 更新用户头像
     public User updateUserAvatar(String username, String avatarUrl) {
         User user = userRepository.findByUsername(username);
