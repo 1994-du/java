@@ -1,6 +1,5 @@
 package com.springbootproject.Service;
 
-import com.springbootproject.Controller.NativeWebSocketController;
 import com.springbootproject.Entity.Friendship;
 import com.springbootproject.Entity.User;
 import com.springbootproject.Repository.FriendshipRepository;
@@ -59,32 +58,12 @@ public class FriendshipService {
                 friendship.setUserId(userId);
                 friendship.setFriendId(friendId);
                 friendship.setUpdateTime(LocalDateTime.now());
-                Friendship saved = friendshipRepository.save(friendship);
-                notifyFriendRequest(friendId, user, saved.getId());
-                return saved;
+                return friendshipRepository.save(friendship);
             }
         }
 
         Friendship friendship = new Friendship(userId, friendId);
-        Friendship saved = friendshipRepository.save(friendship);
-        notifyFriendRequest(friendId, user, saved.getId());
-        return saved;
-    }
-    
-    private void notifyFriendRequest(Long toUserId, User fromUser, Long friendshipId) {
-        String avatar = fromUser.getAvatar();
-        if (avatar == null || avatar.isEmpty()) {
-            avatar = "/uploads/avatars/default.png";
-        } else if (!avatar.startsWith("/uploads/")) {
-            avatar = "/uploads/avatars/" + avatar;
-        }
-        NativeWebSocketController.sendFriendRequestNotification(
-            toUserId, 
-            fromUser.getId(), 
-            fromUser.getUsername(), 
-            avatar, 
-            friendshipId
-        );
+        return friendshipRepository.save(friendship);
     }
 
     @Transactional
@@ -102,25 +81,7 @@ public class FriendshipService {
 
         friendship.setStatus("accepted");
         friendship.setUpdateTime(LocalDateTime.now());
-        Friendship saved = friendshipRepository.save(friendship);
-        
-        User accepter = userRepository.findById(userId).orElse(null);
-        if (accepter != null) {
-            String avatar = accepter.getAvatar();
-            if (avatar == null || avatar.isEmpty()) {
-                avatar = "/uploads/avatars/default.png";
-            } else if (!avatar.startsWith("/uploads/")) {
-                avatar = "/uploads/avatars/" + avatar;
-            }
-            NativeWebSocketController.sendFriendAcceptedNotification(
-                friendship.getUserId(),
-                accepter.getId(),
-                accepter.getUsername(),
-                avatar
-            );
-        }
-        
-        return saved;
+        return friendshipRepository.save(friendship);
     }
 
     @Transactional
