@@ -48,7 +48,30 @@ public class NativeWebSocketController {
         try {
             List<Map<String, Object>> usersList = new ArrayList<>();
             for (Map<String, Object> userInfo : onlineUsers.values()) {
-                usersList.add(userInfo);
+                Map<String, Object> userWithAvatar = new HashMap<>(userInfo);
+                
+                if (userInfo.containsKey("userId") && userService != null) {
+                    try {
+                        Long uid = Long.parseLong(userInfo.get("userId").toString());
+                        User user = userService.findUserById(uid);
+                        if (user != null && user.getAvatar() != null && !user.getAvatar().isEmpty()) {
+                            String avatar = user.getAvatar();
+                            if (avatar.startsWith("/uploads/")) {
+                                userWithAvatar.put("avatar", avatar);
+                            } else {
+                                userWithAvatar.put("avatar", "/uploads/avatars/" + avatar);
+                            }
+                        } else {
+                            userWithAvatar.put("avatar", "/uploads/avatars/default.png");
+                        }
+                    } catch (Exception e) {
+                        userWithAvatar.put("avatar", "/uploads/avatars/default.png");
+                    }
+                } else {
+                    userWithAvatar.put("avatar", "/uploads/avatars/default.png");
+                }
+                
+                usersList.add(userWithAvatar);
             }
             
             Map<String, Object> response = new HashMap<>();
