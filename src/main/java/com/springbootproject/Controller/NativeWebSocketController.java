@@ -2,7 +2,9 @@ package com.springbootproject.Controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springbootproject.Config.WebSocketConfig;
+import com.springbootproject.Entity.ChatMessage;
 import com.springbootproject.Entity.User;
+import com.springbootproject.Service.ChatMessageService;
 import com.springbootproject.Service.UserService;
 import jakarta.websocket.*;
 import jakarta.websocket.server.ServerEndpoint;
@@ -21,10 +23,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class NativeWebSocketController {
     
     private static UserService userService;
+    private static ChatMessageService chatMessageService;
     
     @Autowired
     public void setUserService(UserService userService) {
         NativeWebSocketController.userService = userService;
+    }
+    
+    @Autowired
+    public void setChatMessageService(ChatMessageService chatMessageService) {
+        NativeWebSocketController.chatMessageService = chatMessageService;
     }
     
     private static final CopyOnWriteArraySet<Session> webSocketSet = new CopyOnWriteArraySet<>();
@@ -81,8 +89,43 @@ public class NativeWebSocketController {
             String json = objectMapper.writeValueAsString(response);
             session.getBasicRemote().sendText(json);
             System.out.println("=== 发送在线用户列表，数量: " + usersList.size() + " ===");
+            
+            sendRecentChatHistory(session);
         } catch (Exception e) {
             System.out.println("=== 发送在线用户列表失败: " + e.getMessage() + " ===");
+        }
+    }
+    
+    private void sendRecentChatHistory(Session session) {
+        try {
+            if (chatMessageService == null) {
+                return;
+            }
+            
+            List<ChatMessage> messages = chatMessageService.getRecentMessages();
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            
+            List<Map<String, Object>> historyList = new ArrayList<>();
+            for (ChatMessage msg : messages) {
+                Map<String, Object> msgMap = new HashMap<>();
+                msgMap.put("id", msg.getId());
+                msgMap.put("userId", msg.getUserId());
+                msgMap.put("username", msg.getUsername());
+                msgMap.put("message", msg.getMessage());
+                msgMap.put("avatar", msg.getAvatar() != null ? msg.getAvatar() : "/uploads/avatars/default.png");
+                msgMap.put("time", msg.getCreateTime() != null ? sdf.format(java.sql.Timestamp.valueOf(msg.getCreateTime())) : "");
+                historyList.add(msgMap);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("type", "chatHistory");
+            response.put("payload", historyList);
+            
+            String json = objectMapper.writeValueAsString(response);
+            session.getBasicRemote().sendText(json);
+            System.out.println("=== 发送最近聊天记录，数量: " + historyList.size() + " ===");
+        } catch (Exception e) {
+            System.out.println("=== 发送聊天记录失败: " + e.getMessage() + " ===");
         }
     }
     
@@ -410,6 +453,15 @@ public class NativeWebSocketController {
             
             String chatJson = objectMapper.writeValueAsString(response);
             broadcastMessage(chatJson);
+            
+            if (chatMessageService != null && processedPayload.containsKey("message")) {
+                try {
+                    String username = processedPayload.getOrDefault("username", "匿名用户");
+                    chatMessageService.saveMessage(chatUserId, username, processedPayload.get("message"), avatarUrl);
+                } catch (Exception e) {
+                    System.out.println("=== 保存聊天记录失败: " + e.getMessage() + " ===");
+                }
+            }
             
             System.out.println("=== 聊天消息广播完成 ===");
             
