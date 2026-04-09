@@ -1,11 +1,8 @@
 package com.springbootproject.Model;
 
-import lombok.Data;
-
 /**
  * 统一API响应结构
  */
-@Data
 public class ApiResponse<T> {
     
     /**
@@ -27,6 +24,39 @@ public class ApiResponse<T> {
      * 总条数
      */
     private Long total;
+    
+    // Getters and Setters
+    public Number getCode() {
+        return code;
+    }
+    
+    public void setCode(Number code) {
+        this.code = code;
+    }
+    
+    public String getMsg() {
+        return msg;
+    }
+    
+    public void setMsg(String msg) {
+        this.msg = msg;
+    }
+    
+    public T getData() {
+        return data;
+    }
+    
+    public void setData(T data) {
+        this.data = data;
+    }
+    
+    public Long getTotal() {
+        return total;
+    }
+    
+    public void setTotal(Long total) {
+        this.total = total;
+    }
     
     /**
      * 创建成功响应
