@@ -5,10 +5,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.context.annotation.ComponentScan;
 
 @SpringBootApplication
+@ComponentScan("com.springbootproject")
 @EnableJpaRepositories("com.springbootproject.Repository")
-@EntityScan("com.springbootproject.Entity")
+@EntityScan(basePackages = "com.springbootproject")
 @EnableScheduling
 public class SpringBootProjectApplication {
 
