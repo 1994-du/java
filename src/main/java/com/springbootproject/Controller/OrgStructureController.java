@@ -36,14 +36,19 @@ public class OrgStructureController {
     }
     
     /**
-     * 获取组织结构树形结构
+     * 获取组织结构树形结构（支持通过parentId查询子节点）
+     * @param requestBody 请求体，包含parentId（可选，不传则查询根节点）
      * @return 组织结构树形结构
      */
-    @GetMapping("/tree")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getOrgStructureTree() {
+    @PostMapping("/tree")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getOrgStructureTree(@RequestBody(required = false) Map<String, Long> requestBody) {
         try {
+            Long parentId = null;
+            if (requestBody != null && requestBody.containsKey("parentId")) {
+                parentId = requestBody.get("parentId");
+            }
             List<OrgStructure> structures = orgStructureService.getAllOrgStructures();
-            List<Map<String, Object>> tree = orgStructureService.buildOrgStructureTree(structures, null);
+            List<Map<String, Object>> tree = orgStructureService.buildOrgStructureTree(structures, parentId);
             return ResponseEntity.ok(ApiResponse.success("获取组织结构树形结构成功", tree));
         } catch (Exception e) {
             e.printStackTrace();

@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -59,7 +60,11 @@ public class OrgStructureService {
         List<Map<String, Object>> tree = new ArrayList<>();
         
         for (OrgStructure structure : structures) {
-            if (structure.getParentId() == parentId) {
+            // 支持 null 或 0 作为根节点的 parentId
+            Long structureParentId = structure.getParentId();
+            boolean isRootNode = (parentId == null && (structureParentId == null || structureParentId == 0))
+                    || (parentId != null && Objects.equals(structureParentId, parentId));
+            if (isRootNode) {
                 Map<String, Object> node = new HashMap<>();
                 node.put("id", structure.getId());
                 node.put("name", structure.getName());
