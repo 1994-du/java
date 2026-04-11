@@ -187,6 +187,9 @@ public class NativeWebSocketController {
                 case "chat":
                     handleChatMessage(messageMap, session);
                     break;
+                case "card":
+                    handleCardMessage(messageMap, session);
+                    break;
                 default:
                     System.out.println("[消息类型] 未知消息类型: " + messageType);
                     sendSimpleErrorMessage(session, "不支持的消息类型");
@@ -552,5 +555,139 @@ public class NativeWebSocketController {
         } catch (Throwable t) {
             return "safe_image.jpg";
         }
+    }
+    
+    private void handleCardMessage(Map<String, Object> messageMap, Session session) {
+        System.out.println("=== 开始处理卡片消息 ===");
+        try {
+            if (!messageMap.containsKey("payload")) {
+                System.out.println("=== 错误：卡片消息缺少payload字段 ===");
+                sendSimpleErrorMessage(session, "卡片消息缺少payload字段");
+                return;
+            }
+            
+            Map<String, Object> originalPayload = (Map<String, Object>) messageMap.get("payload");
+            System.out.println("=== 收到卡片消息payload，包含字段数: " + originalPayload.size() + " ===");
+            
+            Map<String, String> processedPayload = new HashMap<>();
+            
+            // 只需要title和content两个必填字段
+            String title = (String) originalPayload.get("title");
+            String content = (String) originalPayload.get("content");
+            
+            if (title == null || title.trim().isEmpty()) {
+                sendSimpleErrorMessage(session, "卡片标题不能为空");
+                return;
+            }
+            
+            if (content == null || content.trim().isEmpty()) {
+                sendSimpleErrorMessage(session, "卡片内容不能为空");
+                return;
+            }
+            
+            processedPayload.put("title", title);
+            processedPayload.put("content", content);
+            
+            // 可选字段
+            if (originalPayload.containsKey("buttonText")) {
+                processedPayload.put("buttonText", originalPayload.get("buttonText").toString());
+            }
+            if (originalPayload.containsKey("buttonUrl")) {
+                processedPayload.put("buttonUrl", originalPayload.get("buttonUrl").toString());
+            }
+            
+            // 获取发送者信息
+            Long cardUserId = null;
+            if (originalPayload.containsKey("userId")) {
+                try {
+                    cardUserId = Long.parseLong(originalPayload.get("userId").toString());
+                } catch (NumberFormatException e) {
+                    System.out.println("=== userId格式错误 ===");
+                }
+            }
+            
+            if (cardUserId != null) {
+                processedPayload.put("userId", cardUserId.toString());
+            }
+            
+            // 自动添加时间
+            String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+            processedPayload.put("time", time);
+            
+            // 自动添加用户名
+            String username = "匿名用户";
+            if (session != null && session.getUserProperties().containsKey("username")) {
+                username = session.getUserProperties().get("username").toString();
+            }
+            processedPayload.put("username", username);
+            
+            // 自动添加头像
+            String avatarUrl = "/uploads/avatars/default.png";
+            if (cardUserId != null) {
+                System.out.println("=== 尝试获取用户头像，userId: " + cardUserId + " ===");
+                if (userService != null) {
+                    User user = userService.findUserById(cardUserId);
+                    System.out.println("=== 查询到用户: " + (user != null ? user.getUsername() : "null") + " ===");
+                    if (user != null) {
+                        System.out.println("=== 用户头像: " + user.getAvatar() + " ===");
+                        if (user.getAvatar() != null && !user.getAvatar().isEmpty()) {
+                            String avatar = user.getAvatar();
+                            if (avatar.startsWith("/uploads/")) {
+                                avatarUrl = avatar;
+                            } else {
+                                avatarUrl = "/uploads/avatars/" + avatar;
+                            }
+                        }
+                    }
+                } else {
+                    System.out.println("=== userService为null ===");
+                }
+            } else {
+                System.out.println("=== cardUserId为null ===");
+            }
+            System.out.println("=== 最终头像URL: " + avatarUrl + " ===");
+            
+            processedPayload.put("avatar", avatarUrl);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("type", "card");
+            response.put("payload", processedPayload);
+            
+            String cardJson = objectMapper.writeValueAsString(response);
+            broadcastMessage(cardJson);
+            
+            // 发送卡片成功提醒
+            sendCardSuccessNotification(session, processedPayload);
+            
+            System.out.println("=== 卡片消息广播完成 ===");
+            
+        } catch (Exception e) {
+            System.out.println("=== 处理卡片消息时发生异常: " + e.getMessage() + " ===");
+            e.printStackTrace();
+            sendSimpleErrorMessage(session, "处理卡片消息失败: " + e.getMessage());
+        }
+    }
+    
+    private void sendCardSuccessNotification(Session session, Map<String, String> cardPayload) {
+        try {
+            if (session != null && session.isOpen()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("type", "cardSuccess");
+                Map<String, String> payload = new HashMap<>();
+                payload.put("message", "卡片发送成功");
+                payload.put("cardTitle", cardPayload.getOrDefault("title", "卡片"));
+                response.put("payload", payload);
+                
+                String errorJson = objectMapper.writeValueAsString(response);
+                session.getBasicRemote().sendText(errorJson);
+                System.out.println("[卡片成功通知] 已发送成功提示");
+            }
+        } catch (Exception e) {
+            System.out.println("[卡片成功通知] 发送失败: " + e.getMessage());
+        }
+    }
+    
+    public void broadcastCardMessage(String cardJson) {
+        broadcastMessage(cardJson);
     }
 }

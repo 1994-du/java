@@ -16,4 +16,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByUsername(String username);
     
     java.util.List<User> findByUsernameContaining(String username);
+    
+    org.springframework.data.domain.Page<User> findByUsernameContaining(String username, org.springframework.data.domain.Pageable pageable);
 }

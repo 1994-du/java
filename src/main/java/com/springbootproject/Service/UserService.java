@@ -82,6 +82,14 @@ public class UserService {
         return userRepository.findByUsernameContaining(username);
     }
     
+    // 分页搜索用户
+    public Page<User> searchUsers(String keyword, Pageable pageable) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return userRepository.findAll(pageable);
+        }
+        return userRepository.findByUsernameContaining(keyword, pageable);
+    }
+    
     // 更新用户头像
     public User updateUserAvatar(String username, String avatarUrl) {
         User user = userRepository.findByUsername(username);

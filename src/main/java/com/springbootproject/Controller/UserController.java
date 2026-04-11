@@ -97,9 +97,10 @@ public class UserController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> getUsers(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
+            @RequestParam(required = false) String keyword,
             @RequestBody(required = false) Map<String, Object> requestBody) {
         
-        // 如果是POST请求且有请求体，优先从请求体获取分页参数
+        // 如果是POST请求且有请求体，优先从请求体获取参数
         if (requestBody != null) {
             // 尝试从请求体获取page参数
             if (requestBody.containsKey("page")) {
@@ -128,6 +129,14 @@ public class UserController {
                     System.err.println("解析pageSize参数失败: " + e.getMessage());
                 }
             }
+            
+            // 尝试从请求体获取搜索关键词
+            if (requestBody.containsKey("keyword")) {
+                Object keywordObj = requestBody.get("keyword");
+                if (keywordObj instanceof String) {
+                    keyword = (String) keywordObj;
+                }
+            }
         }
         
         // 确保page和pageSize为有效值
@@ -137,8 +146,8 @@ public class UserController {
         // 创建分页对象，将前端页码转换为JPA需要的从0开始的页码
         Pageable pageable = PageRequest.of(page - 1, pageSize);
         
-        // 获取分页用户数据
-        Page<User> userPage = userService.getAllUsers(pageable);
+        // 获取分页用户数据（支持搜索）
+        Page<User> userPage = userService.searchUsers(keyword, pageable);
         
         // 过滤用户列表，移除password字段
         List<Map<String, Object>> userListWithoutPassword = new ArrayList<>();

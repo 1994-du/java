@@ -82,14 +82,43 @@ public class RoleController {
     @PostMapping("/getRoles")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getRoles(
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String keyword,
+            @RequestBody(required = false) Map<String, Object> requestBody) {
+
+        // 从请求体获取参数
+        if (requestBody != null) {
+            if (requestBody.containsKey("keyword")) {
+                Object keywordObj = requestBody.get("keyword");
+                if (keywordObj instanceof String) {
+                    keyword = (String) keywordObj;
+                }
+            }
+        }
 
         Map<String, Object> result = new HashMap<>();
         List<Map<String, Object>> roleList = new ArrayList<>();
 
         try (Connection connection = dataSource.getConnection()) {
-            String countSql = "SELECT COUNT(*) FROM sys_roles";
-            try (PreparedStatement countStmt = connection.prepareStatement(countSql)) {
+            // 构建带搜索条件的SQL
+            StringBuilder countSql = new StringBuilder("SELECT COUNT(*) FROM sys_roles");
+            StringBuilder sql = new StringBuilder("SELECT * FROM sys_roles");
+            List<Object> params = new ArrayList<>();
+            
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                System.out.println("搜索关键词: " + keyword);
+                countSql.append(" WHERE name LIKE ?");
+                sql.append(" WHERE name LIKE ?");
+                params.add("%" + keyword.trim() + "%");
+                System.out.println("生成的搜索SQL: " + sql.toString());
+                System.out.println("搜索参数: " + params);
+            }
+            
+            // 执行计数查询
+            try (PreparedStatement countStmt = connection.prepareStatement(countSql.toString())) {
+                for (int i = 0; i < params.size(); i++) {
+                    countStmt.setObject(i + 1, params.get(i));
+                }
                 ResultSet countRs = countStmt.executeQuery();
                 if (countRs.next()) {
                     long total = countRs.getLong(1);
@@ -99,10 +128,14 @@ public class RoleController {
             }
 
             int offset = (page - 1) * size;
-            String sql = "SELECT * FROM sys_roles LIMIT ? OFFSET ?";
-            try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-                stmt.setInt(1, size);
-                stmt.setInt(2, offset);
+            sql.append(" LIMIT ? OFFSET ?");
+            params.add(size);
+            params.add(offset);
+            
+            try (PreparedStatement stmt = connection.prepareStatement(sql.toString())) {
+                for (int i = 0; i < params.size(); i++) {
+                    stmt.setObject(i + 1, params.get(i));
+                }
 
                 ResultSet rs = stmt.executeQuery();
                 int columnCount = rs.getMetaData().getColumnCount();
