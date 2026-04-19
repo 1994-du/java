@@ -20,6 +20,11 @@ public class CardService {
         return cardRepository.save(card);
     }
 
+    // 根据ID获取卡片模板
+    public Card getCardById(Long cardId) {
+        return cardRepository.findById(cardId).orElse(null);
+    }
+
     // 获取用户收到的卡片列表（包括广播卡片）
     public List<Card> getReceivedCards(Long userId) {
         // 先获取用户自己的卡片
