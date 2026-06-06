@@ -1,110 +1,139 @@
 package com.springbootproject.Controller;
 
+import com.springbootproject.Model.ApiResponse;
 import com.springbootproject.Service.UploadStorageService;
-import org.springframework.http.HttpStatus;
+import com.springbootproject.Service.WpsService;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.UUID;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/file")
 public class FileUploadController {
 
     // 最大文件大小 (5MB)
     private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
     // 允许的文件类型
-    private static final String[] ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx", ".txt"};
+    private static final String[] ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx", ".txt", ".xlsx", ".xls", ".pptx", ".ppt"};
+    private static final String[] IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"};
+    // WPS支持的文档类型
+    private static final String[] WPS_EXTENSIONS = {".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".pdf", ".txt"};
 
     @Autowired
     private UploadStorageService uploadStorageService;
 
-    @PostMapping("/upload")
+    @Autowired
+    private WpsService wpsService;
+
+    @PostMapping(value = "/api/file/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
-        Map<String, Object> response = new HashMap<>();
-
         try {
-            // 检查文件是否为空
-            if (file.isEmpty()) {
-                response.put("status", "error");
-                response.put("message", "文件不能为空");
-                return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-            }
+            validateFile(file);
 
-            // 检查文件大小
-            if (file.getSize() > MAX_FILE_SIZE) {
-                response.put("status", "error");
-                response.put("message", "文件大小不能超过5MB");
-                return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-            }
-
-            // 获取文件原始名称和扩展名
             String originalFilename = file.getOriginalFilename();
-            if (originalFilename == null) {
-                response.put("status", "error");
-                response.put("message", "无法获取文件名");
-                return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-            }
-
-            // 检查文件类型
             String fileExtension = getFileExtension(originalFilename).toLowerCase();
             if (!isAllowedExtension(fileExtension)) {
-                response.put("status", "error");
-                response.put("message", "不支持的文件类型");
-                return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+                return ResponseEntity.badRequest().body(ApiResponse.error("不支持的文件类型"));
             }
 
-            Path uploadDir = uploadStorageService.getFilesDir();
-            System.out.println("上传目录存在: " + uploadDir + ", 可写: " + java.nio.file.Files.isWritable(uploadDir));
-
-            // 生成唯一文件名
-            String uniqueFilename = generateUniqueFilename(fileExtension);
-            Path filePath = uploadDir.resolve(uniqueFilename);
-
-            // 保存文件
-            file.transferTo(filePath.toFile());
-
-            // 构建文件访问URL
-            String fileUrl = uploadStorageService.buildFileUrl(uniqueFilename);
-
-            // 返回成功响应
-            response.put("status", "success");
-            response.put("message", "文件上传成功");
-            response.put("fileUrl", fileUrl);
-            response.put("filename", uniqueFilename);
-            response.put("originalFilename", originalFilename);
-            response.put("size", file.getSize());
-
-            System.out.println("=== 文件上传成功 ===");
-            System.out.println("原始文件名: " + originalFilename);
-            System.out.println("保存文件名: " + uniqueFilename);
-            System.out.println("文件大小: " + file.getSize() + " bytes");
-            System.out.println("文件URL: " + fileUrl);
-
-            return new ResponseEntity<>(response, HttpStatus.OK);
-
+            Map<String, Object> data = saveFile(file, fileExtension, "file_");
+            return ResponseEntity.ok(ApiResponse.success("文件上传成功", data));
         } catch (IOException e) {
             System.out.println("=== 文件上传失败 ===");
             e.printStackTrace();
-            response.put("status", "error");
-            response.put("message", "文件保存失败: " + e.getMessage());
-            return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+            return ResponseEntity.status(500).body(ApiResponse.error("文件保存失败: " + e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
             System.out.println("=== 文件上传发生异常 ===");
             e.printStackTrace();
-            response.put("status", "error");
-            response.put("message", "文件上传失败: " + e.getMessage());
-            return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+            return ResponseEntity.status(500).body(ApiResponse.error("文件上传失败: " + e.getMessage()));
         }
+    }
+
+    @PostMapping(value = "/api/files/upload-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file) {
+        try {
+            validateFile(file);
+
+            String originalFilename = file.getOriginalFilename();
+            String fileExtension = getFileExtension(originalFilename).toLowerCase();
+            if (!isImageExtension(fileExtension)) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("仅支持图片文件"));
+            }
+
+            String contentType = file.getContentType();
+            if (contentType != null && !contentType.isBlank() && !contentType.toLowerCase().startsWith("image/")) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("仅支持图片文件"));
+            }
+
+            Map<String, Object> data = saveFile(file, fileExtension, "image_");
+            return ResponseEntity.ok(ApiResponse.success("图片上传成功", data));
+        } catch (IOException e) {
+            System.out.println("=== 图片上传失败 ===");
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ApiResponse.error("图片保存失败: " + e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            System.out.println("=== 图片上传发生异常 ===");
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ApiResponse.error("图片上传失败: " + e.getMessage()));
+        }
+    }
+
+    private void validateFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("文件不能为空");
+        }
+
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new IllegalArgumentException("文件大小不能超过5MB");
+        }
+
+        if (file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()) {
+            throw new IllegalArgumentException("无法获取文件名");
+        }
+    }
+
+    private Map<String, Object> saveFile(MultipartFile file, String fileExtension, String filenamePrefix) throws IOException {
+        Path uploadDir = uploadStorageService.getFilesDir();
+        Files.createDirectories(uploadDir);
+        System.out.println("上传目录存在: " + uploadDir + ", 可写: " + Files.isWritable(uploadDir));
+
+        String uniqueFilename = generateUniqueFilename(filenamePrefix, fileExtension);
+        Path filePath = uploadDir.resolve(uniqueFilename);
+        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+        String fileUrl = uploadStorageService.buildFileUrl(uniqueFilename);
+        String originalFilename = file.getOriginalFilename();
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("fileUrl", fileUrl);
+        data.put("filename", uniqueFilename);
+        data.put("originalFilename", originalFilename);
+        data.put("size", file.getSize());
+        data.put("contentType", file.getContentType());
+
+        System.out.println("=== 文件上传成功 ===");
+        System.out.println("原始文件名: " + originalFilename);
+        System.out.println("保存文件名: " + uniqueFilename);
+        System.out.println("文件大小: " + file.getSize() + " bytes");
+        System.out.println("文件URL: " + fileUrl);
+
+        return data;
     }
 
     // 获取文件扩展名
@@ -115,17 +144,55 @@ public class FileUploadController {
 
     // 检查是否是允许的文件扩展名
     private boolean isAllowedExtension(String extension) {
-        for (String allowedExtension : ALLOWED_EXTENSIONS) {
-            if (allowedExtension.equals(extension)) {
-                return true;
-            }
-        }
-        return false;
+        return Arrays.asList(ALLOWED_EXTENSIONS).contains(extension);
+    }
+
+    private boolean isImageExtension(String extension) {
+        return Arrays.asList(IMAGE_EXTENSIONS).contains(extension);
     }
 
     // 生成唯一文件名
-    private String generateUniqueFilename(String extension) {
+    private String generateUniqueFilename(String prefix, String extension) {
         String uuid = UUID.randomUUID().toString();
-        return "file_" + uuid + extension;
+        return prefix + uuid + extension;
+    }
+
+    /**
+     * 上传文件并自动上传到WPS
+     */
+    @PostMapping(value = "/api/file/upload-wps", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadFileToWps(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "userId", required = false) Long userId,
+            @RequestParam(value = "uploadToWps", defaultValue = "true") boolean uploadToWps) {
+        try {
+            validateFile(file);
+
+            String originalFilename = file.getOriginalFilename();
+            String fileExtension = getFileExtension(originalFilename).toLowerCase();
+            
+            if (!isWpsExtension(fileExtension)) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("不支持的文件类型，仅支持: .doc, .docx, .xls, .xlsx, .ppt, .pptx, .pdf, .txt"));
+            }
+
+            if (uploadToWps) {
+                // 上传到WPS
+                Map<String, Object> result = wpsService.uploadToWps(file, userId);
+                return ResponseEntity.ok(ApiResponse.success("文件上传成功（WPS）", result));
+            } else {
+                // 只上传到本地
+                Map<String, Object> data = saveFile(file, fileExtension, "file_");
+                return ResponseEntity.ok(ApiResponse.success("文件上传成功", data));
+            }
+        } catch (Exception e) {
+            System.out.println("=== WPS文件上传失败 ===");
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ApiResponse.error("文件上传失败: " + e.getMessage()));
+        }
+    }
+
+    // 检查是否是WPS支持的文件扩展名
+    private boolean isWpsExtension(String extension) {
+        return Arrays.asList(WPS_EXTENSIONS).contains(extension);
     }
 }

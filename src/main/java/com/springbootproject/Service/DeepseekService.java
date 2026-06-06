@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class DeepseekService {
 
-    private static final String API_KEY = "sk-f15f54c7e8914b769da5745644b2838a";
+    private static final String API_KEY = "sk-bbce620b484e42cabab0bce1a4e71a54";
     private static final String API_URL = "https://api.deepseek.com/v1/chat/completions";
 
     public String callDeepseek(String message) {

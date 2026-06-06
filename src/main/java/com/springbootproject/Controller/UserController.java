@@ -57,16 +57,16 @@ public class UserController {
 
     // 通过用户名获取用户信息（需要JWT认证）
     @GetMapping("/{username}")
-    public ResponseEntity<Map<String, Object>> getUserByUsername(@PathVariable String username) {
-        User user = userService.findUserByUsername(username);
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("status", "success");
-        response.put("message", "获取用户信息成功");
-        response.put("data", user);
-        
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> getUserByUsername(@PathVariable String username) {
+        try {
+            User user = userService.findUserByUsername(username);
+            if (user == null) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("用户不存在"));
+            }
+            return ResponseEntity.ok(ApiResponse.success("获取用户信息成功", user));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(ApiResponse.error("获取用户信息失败: " + e.getMessage()));
+        }
     }
 
     // 注：create接口已被addUser接口替代，addUser接口功能更完整，支持头像和角色设置
@@ -231,16 +231,11 @@ public class UserController {
      * 接收JSON格式参数，包含id字段，将用户密码重置为默认的"123456"（加密）
      */
     @PostMapping("/resetPassword")
-    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody Map<String, Object> requestBody) {
-        Map<String, Object> response = new HashMap<>();
-        
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, Object> requestBody) {
         try {
             // 验证请求体是否包含id字段
             if (!requestBody.containsKey("id") || requestBody.get("id") == null) {
-                response.put("success", false);
-                response.put("status", 400);
-                response.put("message", "用户ID不能为空");
-                return ResponseEntity.badRequest().body(response);
+                return ResponseEntity.badRequest().body(ApiResponse.error("用户ID不能为空"));
             }
             
             // 提取用户ID
@@ -258,27 +253,13 @@ public class UserController {
             userData.put("roleName", updatedUser.getRoleName());
             userData.put("gender", updatedUser.getGender());
             
-            response.put("success", true);
-            response.put("status", "success");
-            response.put("message", "密码重置成功，默认密码为：123456");
-            response.put("data", userData);
-            
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(ApiResponse.success("密码重置成功，默认密码为：123456", userData));
         } catch (NumberFormatException e) {
-            response.put("success", false);
-            response.put("status", 400);
-            response.put("message", "用户ID格式错误");
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error("用户ID格式错误"));
         } catch (RuntimeException e) {
-            response.put("success", false);
-            response.put("status", 404);
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(404).body(response);
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
-            response.put("success", false);
-            response.put("status", 500);
-            response.put("message", "密码重置失败: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(response);
+            return ResponseEntity.internalServerError().body(ApiResponse.error("密码重置失败: " + e.getMessage()));
         }
     }
     

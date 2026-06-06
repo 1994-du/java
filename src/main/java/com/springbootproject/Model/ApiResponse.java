@@ -1,5 +1,7 @@
 package com.springbootproject.Model;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 /**
  * 统一API响应结构
  */
@@ -23,6 +25,7 @@ public class ApiResponse<T> {
     /**
      * 总条数
      */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private Long total;
     
     // Getters and Setters
