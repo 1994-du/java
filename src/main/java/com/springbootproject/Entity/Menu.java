@@ -38,6 +38,15 @@ public class Menu {
     @Column(name = "sort", nullable = false)
     private Integer sort;
 
+    @Column(name = "visible")
+    private Integer visible;
+
+    @Column(name = "status")
+    private Integer status;
+
+    @Column(name = "permission", length = 128)
+    private String permission;
+
     @Column(name = "create_time")
     private Date createTime;
 
@@ -110,6 +119,30 @@ public class Menu {
 
     public void setSort(Integer sort) {
         this.sort = sort;
+    }
+
+    public Integer getVisible() {
+        return visible;
+    }
+
+    public void setVisible(Integer visible) {
+        this.visible = visible;
+    }
+
+    public Integer getStatus() {
+        return status;
+    }
+
+    public void setStatus(Integer status) {
+        this.status = status;
+    }
+
+    public String getPermission() {
+        return permission;
+    }
+
+    public void setPermission(String permission) {
+        this.permission = permission;
     }
 
     public Date getCreateTime() {

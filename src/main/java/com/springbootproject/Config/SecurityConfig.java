@@ -70,8 +70,6 @@ public class SecurityConfig {
 
         http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
 
-        System.out.println("安全配置: 已完全禁用安全限制，允许所有请求访问");
-
         return http.build();
     }
 }

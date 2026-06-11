@@ -31,7 +31,6 @@ public class UploadStorageService {
             Files.createDirectories(getFilesDir());
             migrateLegacyDirectory(LEGACY_SHARED_UPLOAD_ROOT);
             migrateLegacyDirectory(Paths.get(System.getProperty("user.dir"), "uploads"));
-            System.out.println("上传目录已初始化: " + baseUploadDir);
         } catch (IOException e) {
             throw new IllegalStateException("初始化上传目录失败", e);
         }
@@ -89,7 +88,6 @@ public class UploadStorageService {
             }
             Files.createDirectories(targetFile.getParent());
             Files.copy(sourceFile, targetFile, StandardCopyOption.COPY_ATTRIBUTES);
-            System.out.println("已迁移历史上传文件: " + sourceFile + " -> " + targetFile);
         } catch (IOException e) {
             throw new IllegalStateException("迁移历史上传文件失败: " + sourceFile, e);
         }
