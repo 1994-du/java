@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.HashMap;
 import java.util.List;
@@ -38,12 +39,26 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, Object> loginRequest, HttpServletResponse response) {
-        String username = (String) loginRequest.get("username");
-        String password = (String) loginRequest.get("password");
+        return doLogin(loginRequest, response, null, "token");
+    }
 
+    @PostMapping("/app/login")
+    public ResponseEntity<?> appLogin(@RequestBody Map<String, Object> loginRequest,
+                                      HttpServletRequest request,
+                                      HttpServletResponse response) {
+        return doLogin(loginRequest, response, request, "user-token");
+    }
+
+    private ResponseEntity<?> doLogin(Map<String, Object> loginRequest,
+                                      HttpServletResponse response,
+                                      HttpServletRequest request,
+                                      String cookieName) {
         if (loginRequest == null) {
             return ResponseEntity.badRequest().body(ApiResponse.error("请求数据不能为空"));
         }
+
+        String username = (String) loginRequest.get("username");
+        String password = (String) loginRequest.get("password");
 
         if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(ApiResponse.error("用户名和密码不能为空"));
@@ -54,26 +69,12 @@ public class AuthController {
 
             if (user != null) {
                 String token = jwtUtils.generateToken(username);
+                response.addCookie(buildTokenCookie(cookieName, token, 7200));
 
-                Cookie tokenCookie = new Cookie("token", token);
-                tokenCookie.setPath("/");
-                tokenCookie.setMaxAge(7200);
-                tokenCookie.setHttpOnly(true);
-                tokenCookie.setSecure(false);
-                tokenCookie.setAttribute("SameSite", "Strict");
-                response.addCookie(tokenCookie);
-
-                List<Menu> menusTree = menuService.getMenusByRoleId(user.getRoleId());
-
-                Map<String, Object> responseData = new HashMap<>();
-                responseData.put("userId", user.getId());
-                responseData.put("username", username);
-                responseData.put("menus", menusTree);
-                responseData.put("token", token);
-                responseData.put("avatar", user.getAvatar());
-                responseData.put("roleId", user.getRoleId());
-                responseData.put("roleName", user.getRoleName());
-                responseData.put("gender", user.getGender());
+                Map<String, Object> responseData = buildLoginResponseData(user, username, token);
+                if (request != null) {
+                    responseData.put("requestUrl", getRequestUrl(request));
+                }
 
                 return ResponseEntity.ok(ApiResponse.success("登录成功", responseData));
             }
@@ -148,14 +149,42 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletResponse response) {
-        Cookie tokenCookie = new Cookie("token", null);
+        response.addCookie(buildTokenCookie("token", null, 0));
+        response.addCookie(buildTokenCookie("user-token", null, 0));
+
+        return ResponseEntity.ok(ApiResponse.success("退出登录成功", null));
+    }
+
+    private Cookie buildTokenCookie(String cookieName, String token, int maxAge) {
+        Cookie tokenCookie = new Cookie(cookieName, token);
         tokenCookie.setPath("/");
-        tokenCookie.setMaxAge(0);
+        tokenCookie.setMaxAge(maxAge);
         tokenCookie.setHttpOnly(true);
         tokenCookie.setSecure(false);
         tokenCookie.setAttribute("SameSite", "Strict");
-        response.addCookie(tokenCookie);
+        return tokenCookie;
+    }
 
-        return ResponseEntity.ok(ApiResponse.success("退出登录成功", null));
+    private Map<String, Object> buildLoginResponseData(User user, String username, String token) {
+        List<Menu> menusTree = menuService.getMenusByRoleId(user.getRoleId());
+
+        Map<String, Object> responseData = new HashMap<>();
+        responseData.put("userId", user.getId());
+        responseData.put("username", username);
+        responseData.put("menus", menusTree);
+        responseData.put("token", token);
+        responseData.put("avatar", user.getAvatar());
+        responseData.put("roleId", user.getRoleId());
+        responseData.put("roleName", user.getRoleName());
+        responseData.put("gender", user.getGender());
+        return responseData;
+    }
+
+    private String getRequestUrl(HttpServletRequest request) {
+        String queryString = request.getQueryString();
+        if (queryString == null || queryString.isEmpty()) {
+            return request.getRequestURL().toString();
+        }
+        return request.getRequestURL().append("?").append(queryString).toString();
     }
 }
