@@ -61,17 +61,7 @@ public class NativeWebSocketController {
                 if (userInfo.containsKey("userId") && userService != null) {
                     try {
                         Long uid = Long.parseLong(userInfo.get("userId").toString());
-                        User user = userService.findUserById(uid);
-                        if (user != null && user.getAvatar() != null && !user.getAvatar().isEmpty()) {
-                            String avatar = user.getAvatar();
-                            if (avatar.startsWith("/uploads/")) {
-                                userWithAvatar.put("avatar", avatar);
-                            } else {
-                                userWithAvatar.put("avatar", "/uploads/avatars/" + avatar);
-                            }
-                        } else {
-                            userWithAvatar.put("avatar", "/uploads/avatars/default.png");
-                        }
+                        userWithAvatar.put("avatar", getLatestAvatarByUserId(uid));
                     } catch (Exception e) {
                         userWithAvatar.put("avatar", "/uploads/avatars/default.png");
                     }
@@ -112,7 +102,7 @@ public class NativeWebSocketController {
                 msgMap.put("userId", msg.getUserId());
                 msgMap.put("username", msg.getUsername());
                 msgMap.put("message", msg.getMessage());
-                msgMap.put("avatar", msg.getAvatar() != null ? msg.getAvatar() : "/uploads/avatars/default.png");
+                msgMap.put("avatar", getLatestAvatarByUserId(msg.getUserId()));
                 msgMap.put("time", msg.getCreateTime() != null ? sdf.format(java.sql.Timestamp.valueOf(msg.getCreateTime())) : "");
                 historyList.add(msgMap);
             }
@@ -144,6 +134,31 @@ public class NativeWebSocketController {
     public void onError(Session session, Throwable error) {
         System.out.println("发生错误");
         error.printStackTrace();
+    }
+
+    private String getLatestAvatarByUserId(Long userId) {
+        if (userId == null || userService == null) {
+            return "/uploads/avatars/default.png";
+        }
+
+        try {
+            User user = userService.findUserById(userId);
+            return buildAvatarUrl(user);
+        } catch (Exception e) {
+            return "/uploads/avatars/default.png";
+        }
+    }
+
+    private String buildAvatarUrl(User user) {
+        if (user == null || user.getAvatar() == null || user.getAvatar().isEmpty()) {
+            return "/uploads/avatars/default.png";
+        }
+
+        String avatar = user.getAvatar();
+        if (avatar.startsWith("/uploads/")) {
+            return avatar;
+        }
+        return "/uploads/avatars/" + avatar;
     }
     
     @OnMessage
@@ -413,15 +428,8 @@ public class NativeWebSocketController {
                     System.out.println("=== 查询到用户: " + (user != null ? user.getUsername() : "null") + " ===");
                     if (user != null) {
                         System.out.println("=== 用户头像: " + user.getAvatar() + " ===");
-                        if (user.getAvatar() != null && !user.getAvatar().isEmpty()) {
-                            String avatar = user.getAvatar();
-                            if (avatar.startsWith("/uploads/")) {
-                                avatarUrl = avatar;
-                            } else {
-                                avatarUrl = "/uploads/avatars/" + avatar;
-                            }
-                        }
                     }
+                    avatarUrl = buildAvatarUrl(user);
                 } else {
                     System.out.println("=== userService为null ===");
                 }
