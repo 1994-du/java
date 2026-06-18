@@ -29,6 +29,7 @@ public class UploadStorageService {
             baseUploadDir = resolveBaseUploadDir();
             Files.createDirectories(getAvatarDir());
             Files.createDirectories(getFilesDir());
+            Files.createDirectories(getChatDir());
             migrateLegacyDirectory(LEGACY_SHARED_UPLOAD_ROOT);
             migrateLegacyDirectory(Paths.get(System.getProperty("user.dir"), "uploads"));
         } catch (IOException e) {
@@ -44,12 +45,20 @@ public class UploadStorageService {
         return baseUploadDir.resolve("files");
     }
 
+    public Path getChatDir() {
+        return baseUploadDir.resolve("chat");
+    }
+
     public String buildAvatarUrl(String filename) {
         return "/uploads/avatars/" + filename;
     }
 
     public String buildFileUrl(String filename) {
         return "/uploads/files/" + filename;
+    }
+
+    public String buildChatUrl(String filename) {
+        return "/uploads/chat/" + filename;
     }
 
     public String[] getResourceLocations() {

@@ -94,6 +94,38 @@ public class FileUploadController {
         }
     }
 
+    @PostMapping(value = "/api/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadChatImage(@RequestParam("file") MultipartFile file,
+                                             @RequestParam(value = "text", required = false) String text) {
+        try {
+            validateFile(file);
+
+            String originalFilename = file.getOriginalFilename();
+            String fileExtension = getFileExtension(originalFilename).toLowerCase();
+            if (!isImageExtension(fileExtension)) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("仅支持图片文件"));
+            }
+
+            String contentType = file.getContentType();
+            if (contentType != null && !contentType.isBlank() && !contentType.toLowerCase().startsWith("image/")) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("仅支持图片文件"));
+            }
+
+            Map<String, Object> data = saveChatImage(file, fileExtension, text);
+            return ResponseEntity.ok(ApiResponse.success("success", data));
+        } catch (IOException e) {
+            System.out.println("=== 聊天图片上传失败 ===");
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ApiResponse.error("图片保存失败: " + e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            System.out.println("=== 聊天图片上传发生异常 ===");
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ApiResponse.error("图片上传失败: " + e.getMessage()));
+        }
+    }
+
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("文件不能为空");
@@ -132,6 +164,41 @@ public class FileUploadController {
         System.out.println("保存文件名: " + uniqueFilename);
         System.out.println("文件大小: " + file.getSize() + " bytes");
         System.out.println("文件URL: " + fileUrl);
+
+        return data;
+    }
+
+    private Map<String, Object> saveChatImage(MultipartFile file, String fileExtension, String text) throws IOException {
+        Path uploadDir = uploadStorageService.getChatDir();
+        Files.createDirectories(uploadDir);
+        System.out.println("聊天图片上传目录存在: " + uploadDir + ", 可写: " + Files.isWritable(uploadDir));
+
+        String uniqueFilename = generateUniqueFilename("chat_", fileExtension);
+        Path filePath = uploadDir.resolve(uniqueFilename);
+        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+        String chatUrl = uploadStorageService.buildChatUrl(uniqueFilename);
+        String originalFilename = file.getOriginalFilename();
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("url", chatUrl);
+        data.put("imageUrl", chatUrl);
+        data.put("fileUrl", chatUrl);
+        data.put("path", chatUrl);
+        data.put("src", chatUrl);
+        data.put("filename", uniqueFilename);
+        data.put("originalFilename", originalFilename);
+        data.put("size", file.getSize());
+        data.put("contentType", file.getContentType());
+        if (text != null) {
+            data.put("text", text);
+        }
+
+        System.out.println("=== 聊天图片上传成功 ===");
+        System.out.println("原始文件名: " + originalFilename);
+        System.out.println("保存文件名: " + uniqueFilename);
+        System.out.println("文件大小: " + file.getSize() + " bytes");
+        System.out.println("聊天图片URL: " + chatUrl);
 
         return data;
     }
