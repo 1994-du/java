@@ -104,7 +104,7 @@ public class NativeWebSocketController {
                 msgMap.put("message", msg.getMessage());
                 msgMap.put("avatar", getLatestAvatarByUserId(msg.getUserId()));
                 if (msg.getImageUrl() != null && !msg.getImageUrl().isEmpty()) {
-                    msgMap.put("imageUrl", msg.getImageUrl());
+                    msgMap.put("imageUrl", normalizeChatImageUrl(msg.getImageUrl()));
                     msgMap.put("isImage", true);
                 }
                 msgMap.put("time", msg.getCreateTime() != null ? sdf.format(java.sql.Timestamp.valueOf(msg.getCreateTime())) : "");
@@ -163,6 +163,18 @@ public class NativeWebSocketController {
             return avatar;
         }
         return "/uploads/avatars/" + avatar;
+    }
+
+    private String normalizeChatImageUrl(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return null;
+        }
+
+        if (imageUrl.startsWith("/uploads/")) {
+            return imageUrl;
+        }
+
+        return "/uploads/chat/" + imageUrl;
     }
     
     @OnMessage
@@ -447,7 +459,7 @@ public class NativeWebSocketController {
             if (imageData != null) {
                 try {
                     String imageUrl = saveBase64ImageExtremelySafe(imageData);
-                    processedPayload.put("imageUrl", imageUrl);
+                    processedPayload.put("imageUrl", normalizeChatImageUrl(imageUrl));
                     processedPayload.put("image", imageData);
                 } catch (Throwable t) {
                     System.out.println("=== 处理图片数据时发生异常: " + t.getMessage() + " ===");
