@@ -104,7 +104,9 @@ public class NativeWebSocketController {
                 msgMap.put("message", msg.getMessage());
                 msgMap.put("avatar", getLatestAvatarByUserId(msg.getUserId()));
                 if (msg.getImageUrl() != null && !msg.getImageUrl().isEmpty()) {
-                    msgMap.put("imageUrl", normalizeChatImageUrl(msg.getImageUrl()));
+                    String normalizedImageUrl = normalizeChatImageUrl(msg.getImageUrl());
+                    msgMap.put("imageUrl", normalizedImageUrl);
+                    msgMap.put("image", normalizedImageUrl);
                     msgMap.put("isImage", true);
                 }
                 msgMap.put("time", msg.getCreateTime() != null ? sdf.format(java.sql.Timestamp.valueOf(msg.getCreateTime())) : "");
@@ -170,7 +172,7 @@ public class NativeWebSocketController {
             return null;
         }
 
-        if (imageUrl.startsWith("/uploads/")) {
+        if (imageUrl.startsWith("/uploads/") || imageUrl.startsWith("http://") || imageUrl.startsWith("https://") || imageUrl.startsWith("data:")) {
             return imageUrl;
         }
 
@@ -458,9 +460,11 @@ public class NativeWebSocketController {
             
             if (imageData != null) {
                 try {
-                    String imageUrl = saveBase64ImageExtremelySafe(imageData);
-                    processedPayload.put("imageUrl", normalizeChatImageUrl(imageUrl));
-                    processedPayload.put("image", imageData);
+                    String normalizedImageUrl = isAlreadyUploadedChatImage(imageData)
+                            ? normalizeChatImageUrl(imageData)
+                            : normalizeChatImageUrl(saveBase64ImageExtremelySafe(imageData));
+                    processedPayload.put("imageUrl", normalizedImageUrl);
+                    processedPayload.put("image", normalizedImageUrl);
                 } catch (Throwable t) {
                     System.out.println("=== 处理图片数据时发生异常: " + t.getMessage() + " ===");
                 }
@@ -577,10 +581,18 @@ public class NativeWebSocketController {
     private String saveBase64ImageExtremelySafe(String base64Data) {
         try {
             String shortUuid = UUID.randomUUID().toString().substring(0, 8);
-            return "image_" + shortUuid + ".jpg";
+            return "chat_" + shortUuid + ".jpg";
         } catch (Throwable t) {
-            return "safe_image.jpg";
+            return "chat_safe.jpg";
         }
+    }
+
+    private boolean isAlreadyUploadedChatImage(String imageData) {
+        return imageData != null && (
+                imageData.startsWith("/uploads/chat/") ||
+                imageData.startsWith("/uploads/") ||
+                imageData.startsWith("http://") ||
+                imageData.startsWith("https://"));
     }
     
 
