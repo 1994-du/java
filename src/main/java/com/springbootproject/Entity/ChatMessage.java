@@ -19,17 +19,21 @@ public class ChatMessage {
     private String message;
     
     private String avatar;
+
+    @Column(length = 1000)
+    private String imageUrl;
     
     private LocalDateTime createTime;
 
     public ChatMessage() {
     }
 
-    public ChatMessage(Long userId, String username, String message, String avatar) {
+    public ChatMessage(Long userId, String username, String message, String avatar, String imageUrl) {
         this.userId = userId;
         this.username = username;
         this.message = message;
         this.avatar = avatar;
+        this.imageUrl = imageUrl;
         this.createTime = LocalDateTime.now();
     }
 
@@ -71,6 +75,14 @@ public class ChatMessage {
 
     public void setAvatar(String avatar) {
         this.avatar = avatar;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 
     public LocalDateTime getCreateTime() {

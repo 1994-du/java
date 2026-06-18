@@ -16,8 +16,8 @@ public class ChatMessageService {
     @Autowired
     private ChatMessageRepository chatMessageRepository;
 
-    public ChatMessage saveMessage(Long userId, String username, String message, String avatar) {
-        ChatMessage chatMessage = new ChatMessage(userId, username, message, avatar);
+    public ChatMessage saveMessage(Long userId, String username, String message, String avatar, String imageUrl) {
+        ChatMessage chatMessage = new ChatMessage(userId, username, message, avatar, imageUrl);
         return chatMessageRepository.save(chatMessage);
     }
 

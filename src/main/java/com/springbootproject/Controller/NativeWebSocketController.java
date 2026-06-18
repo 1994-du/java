@@ -103,6 +103,10 @@ public class NativeWebSocketController {
                 msgMap.put("username", msg.getUsername());
                 msgMap.put("message", msg.getMessage());
                 msgMap.put("avatar", getLatestAvatarByUserId(msg.getUserId()));
+                if (msg.getImageUrl() != null && !msg.getImageUrl().isEmpty()) {
+                    msgMap.put("imageUrl", msg.getImageUrl());
+                    msgMap.put("isImage", true);
+                }
                 msgMap.put("time", msg.getCreateTime() != null ? sdf.format(java.sql.Timestamp.valueOf(msg.getCreateTime())) : "");
                 historyList.add(msgMap);
             }
@@ -462,10 +466,15 @@ public class NativeWebSocketController {
             String chatJson = objectMapper.writeValueAsString(response);
             broadcastMessage(chatJson);
             
-            if (chatMessageService != null && processedPayload.containsKey("message")) {
+            if (chatMessageService != null && (processedPayload.containsKey("message") || processedPayload.containsKey("imageUrl"))) {
                 try {
                     String username = processedPayload.getOrDefault("username", "匿名用户");
-                    chatMessageService.saveMessage(chatUserId, username, processedPayload.get("message"), avatarUrl);
+                    chatMessageService.saveMessage(
+                            chatUserId,
+                            username,
+                            processedPayload.get("message"),
+                            avatarUrl,
+                            processedPayload.get("imageUrl"));
                 } catch (Exception e) {
                     System.out.println("=== 保存聊天记录失败: " + e.getMessage() + " ===");
                 }
