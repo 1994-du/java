@@ -61,6 +61,10 @@ public class UploadStorageService {
         return "/uploads/chat/" + filename;
     }
 
+    public String buildUploadUrl(String filename) {
+        return "/uploads/chat/" + filename;
+    }
+
     public String[] getResourceLocations() {
         Set<String> resourceLocations = new LinkedHashSet<>();
         addResourceLocation(resourceLocations, baseUploadDir);

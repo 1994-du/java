@@ -28,6 +28,7 @@ public class FileUploadController {
     // 允许的文件类型
     private static final String[] ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx", ".txt", ".xlsx", ".xls", ".pptx", ".ppt"};
     private static final String[] IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"};
+    private static final String[] CHAT_UPLOAD_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".webm"};
     // WPS支持的文档类型
     private static final String[] WPS_EXTENSIONS = {".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".pdf", ".txt"};
 
@@ -102,27 +103,23 @@ public class FileUploadController {
 
             String originalFilename = file.getOriginalFilename();
             String fileExtension = getFileExtension(originalFilename).toLowerCase();
-            if (!isImageExtension(fileExtension)) {
-                return ResponseEntity.badRequest().body(ApiResponse.error("仅支持图片文件"));
-            }
-
             String contentType = file.getContentType();
-            if (contentType != null && !contentType.isBlank() && !contentType.toLowerCase().startsWith("image/")) {
-                return ResponseEntity.badRequest().body(ApiResponse.error("仅支持图片文件"));
+            if (!isChatUploadExtension(fileExtension)) {
+                return ResponseEntity.badRequest().body(ApiResponse.error("仅支持图片或语音文件"));
             }
 
-            Map<String, Object> data = saveChatImage(file, fileExtension, text);
+            Map<String, Object> data = saveChatUpload(file, fileExtension, text, contentType);
             return ResponseEntity.ok(ApiResponse.success("success", data));
         } catch (IOException e) {
-            System.out.println("=== 聊天图片上传失败 ===");
+            System.out.println("=== 聊天文件上传失败 ===");
             e.printStackTrace();
-            return ResponseEntity.status(500).body(ApiResponse.error("图片保存失败: " + e.getMessage()));
+            return ResponseEntity.status(500).body(ApiResponse.error("文件保存失败: " + e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         } catch (Exception e) {
-            System.out.println("=== 聊天图片上传发生异常 ===");
+            System.out.println("=== 聊天文件上传发生异常 ===");
             e.printStackTrace();
-            return ResponseEntity.status(500).body(ApiResponse.error("图片上传失败: " + e.getMessage()));
+            return ResponseEntity.status(500).body(ApiResponse.error("文件上传失败: " + e.getMessage()));
         }
     }
 
@@ -168,37 +165,49 @@ public class FileUploadController {
         return data;
     }
 
-    private Map<String, Object> saveChatImage(MultipartFile file, String fileExtension, String text) throws IOException {
+    private Map<String, Object> saveChatUpload(MultipartFile file, String fileExtension, String text, String contentType) throws IOException {
         Path uploadDir = uploadStorageService.getChatDir();
         Files.createDirectories(uploadDir);
-        System.out.println("聊天图片上传目录存在: " + uploadDir + ", 可写: " + Files.isWritable(uploadDir));
+        System.out.println("聊天文件上传目录存在: " + uploadDir + ", 可写: " + Files.isWritable(uploadDir));
 
-        String uniqueFilename = generateUniqueFilename("chat_", fileExtension);
+        boolean isImage = isImageExtension(fileExtension) || (contentType != null && contentType.toLowerCase().startsWith("image/"));
+        boolean isAudio = contentType != null && (contentType.toLowerCase().startsWith("audio/") || "video/webm".equalsIgnoreCase(contentType));
+
+        String uniqueFilename = generateUniqueFilename(isImage ? "chat_" : "voice_", fileExtension);
         Path filePath = uploadDir.resolve(uniqueFilename);
         Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-        String chatUrl = uploadStorageService.buildChatUrl(uniqueFilename);
+        String uploadUrl = uploadStorageService.buildUploadUrl(uniqueFilename);
         String originalFilename = file.getOriginalFilename();
 
         Map<String, Object> data = new HashMap<>();
-        data.put("url", chatUrl);
-        data.put("imageUrl", chatUrl);
-        data.put("fileUrl", chatUrl);
-        data.put("path", chatUrl);
-        data.put("src", chatUrl);
+        data.put("url", uploadUrl);
+        data.put("fileUrl", uploadUrl);
+        data.put("path", uploadUrl);
+        data.put("src", uploadUrl);
         data.put("filename", uniqueFilename);
         data.put("originalFilename", originalFilename);
         data.put("size", file.getSize());
-        data.put("contentType", file.getContentType());
+        data.put("contentType", contentType);
+        data.put("mediaType", isImage ? "image" : "voice");
+        if (isImage) {
+            data.put("imageUrl", uploadUrl);
+        }
+        if (isAudio) {
+            data.put("voiceUrl", uploadUrl);
+            data.put("audioUrl", uploadUrl);
+            data.put("recordUrl", uploadUrl);
+            data.put("mediaUrl", uploadUrl);
+        }
         if (text != null) {
             data.put("text", text);
         }
 
-        System.out.println("=== 聊天图片上传成功 ===");
+        System.out.println("=== 聊天文件上传成功 ===");
         System.out.println("原始文件名: " + originalFilename);
         System.out.println("保存文件名: " + uniqueFilename);
         System.out.println("文件大小: " + file.getSize() + " bytes");
-        System.out.println("聊天图片URL: " + chatUrl);
+        System.out.println("聊天文件URL: " + uploadUrl);
 
         return data;
     }
@@ -216,6 +225,10 @@ public class FileUploadController {
 
     private boolean isImageExtension(String extension) {
         return Arrays.asList(IMAGE_EXTENSIONS).contains(extension);
+    }
+
+    private boolean isChatUploadExtension(String extension) {
+        return Arrays.asList(CHAT_UPLOAD_EXTENSIONS).contains(extension);
     }
 
     // 生成唯一文件名

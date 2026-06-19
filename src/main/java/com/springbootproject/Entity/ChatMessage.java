@@ -22,18 +22,43 @@ public class ChatMessage {
 
     @Column(length = 1000)
     private String imageUrl;
+
+    @Column(length = 1000)
+    private String voiceUrl;
+
+    @Column(length = 1000)
+    private String audioUrl;
+
+    @Column(length = 1000)
+    private String recordUrl;
+
+    @Column(length = 1000)
+    private String mediaUrl;
+
+    @Column(length = 50)
+    private String messageType;
+
+    private Integer duration;
     
     private LocalDateTime createTime;
 
     public ChatMessage() {
     }
 
-    public ChatMessage(Long userId, String username, String message, String avatar, String imageUrl) {
+    public ChatMessage(Long userId, String username, String message, String avatar, String imageUrl,
+                       String voiceUrl, String audioUrl, String recordUrl, String mediaUrl,
+                       String messageType, Integer duration) {
         this.userId = userId;
         this.username = username;
         this.message = message;
         this.avatar = avatar;
         this.imageUrl = imageUrl;
+        this.voiceUrl = voiceUrl;
+        this.audioUrl = audioUrl;
+        this.recordUrl = recordUrl;
+        this.mediaUrl = mediaUrl;
+        this.messageType = messageType;
+        this.duration = duration;
         this.createTime = LocalDateTime.now();
     }
 
@@ -83,6 +108,54 @@ public class ChatMessage {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public String getVoiceUrl() {
+        return voiceUrl;
+    }
+
+    public void setVoiceUrl(String voiceUrl) {
+        this.voiceUrl = voiceUrl;
+    }
+
+    public String getAudioUrl() {
+        return audioUrl;
+    }
+
+    public void setAudioUrl(String audioUrl) {
+        this.audioUrl = audioUrl;
+    }
+
+    public String getRecordUrl() {
+        return recordUrl;
+    }
+
+    public void setRecordUrl(String recordUrl) {
+        this.recordUrl = recordUrl;
+    }
+
+    public String getMediaUrl() {
+        return mediaUrl;
+    }
+
+    public void setMediaUrl(String mediaUrl) {
+        this.mediaUrl = mediaUrl;
+    }
+
+    public String getMessageType() {
+        return messageType;
+    }
+
+    public void setMessageType(String messageType) {
+        this.messageType = messageType;
+    }
+
+    public Integer getDuration() {
+        return duration;
+    }
+
+    public void setDuration(Integer duration) {
+        this.duration = duration;
     }
 
     public LocalDateTime getCreateTime() {

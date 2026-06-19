@@ -94,6 +94,7 @@ public class NativeWebSocketController {
             
             List<ChatMessage> messages = chatMessageService.getRecentMessages();
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            Map<Long, String> avatarCache = new HashMap<>();
             
             List<Map<String, Object>> historyList = new ArrayList<>();
             for (ChatMessage msg : messages) {
@@ -102,12 +103,33 @@ public class NativeWebSocketController {
                 msgMap.put("userId", msg.getUserId());
                 msgMap.put("username", msg.getUsername());
                 msgMap.put("message", msg.getMessage());
-                msgMap.put("avatar", getLatestAvatarByUserId(msg.getUserId()));
+                msgMap.put("avatar", resolveAvatarForHistory(avatarCache, msg.getUserId()));
                 if (msg.getImageUrl() != null && !msg.getImageUrl().isEmpty()) {
                     String normalizedImageUrl = normalizeChatImageUrl(msg.getImageUrl());
                     msgMap.put("imageUrl", normalizedImageUrl);
                     msgMap.put("image", normalizedImageUrl);
                     msgMap.put("isImage", true);
+                    msgMap.put("messageType", "image");
+                    msgMap.put("type", "image");
+                }
+                if (msg.getVoiceUrl() != null || msg.getAudioUrl() != null || msg.getRecordUrl() != null || msg.getMediaUrl() != null) {
+                    String normalizedVoiceUrl = normalizeUploadUrl(firstNonBlank(
+                            msg.getVoiceUrl(),
+                            msg.getAudioUrl(),
+                            msg.getRecordUrl(),
+                            msg.getMediaUrl()));
+                    if (normalizedVoiceUrl != null) {
+                        msgMap.put("voiceUrl", normalizedVoiceUrl);
+                        msgMap.put("audioUrl", normalizedVoiceUrl);
+                        msgMap.put("recordUrl", normalizedVoiceUrl);
+                        msgMap.put("mediaUrl", normalizedVoiceUrl);
+                        msgMap.put("voice", normalizedVoiceUrl);
+                    }
+                    if (msg.getDuration() != null) {
+                        msgMap.put("duration", msg.getDuration());
+                    }
+                    msgMap.put("messageType", msg.getMessageType() != null ? msg.getMessageType() : "voice");
+                    msgMap.put("type", "voice");
                 }
                 msgMap.put("time", msg.getCreateTime() != null ? sdf.format(java.sql.Timestamp.valueOf(msg.getCreateTime())) : "");
                 historyList.add(msgMap);
@@ -124,6 +146,13 @@ public class NativeWebSocketController {
             System.out.println("=== 发送聊天记录失败: " + e.getMessage() + " ===");
         }
     }
+
+    private String resolveAvatarForHistory(Map<Long, String> avatarCache, Long userId) {
+        if (userId == null) {
+            return "/uploads/avatars/default.png";
+        }
+        return avatarCache.computeIfAbsent(userId, this::getLatestAvatarByUserId);
+    }
     
     @OnClose
     public void onClose(Session session) {
@@ -131,7 +160,7 @@ public class NativeWebSocketController {
         
         if (session != null) {
             webSocketSet.remove(session);
-            onlineCount.decrementAndGet();
+            onlineCount.set(webSocketSet.size());
             System.out.println("在线人数减少为: " + onlineCount.get());
         }
     }
@@ -177,6 +206,18 @@ public class NativeWebSocketController {
         }
 
         return "/uploads/chat/" + imageUrl;
+    }
+
+    private String normalizeUploadUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+
+        if (url.startsWith("/uploads/") || url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+            return url;
+        }
+
+        return "/uploads/chat/" + url;
     }
     
     @OnMessage
@@ -372,13 +413,12 @@ public class NativeWebSocketController {
     private void handleChatMessage(Map<String, Object> messageMap, Session session) {
         System.out.println("=== 开始处理聊天消息 ===");
         try {
-            if (!messageMap.containsKey("payload")) {
-                System.out.println("=== 错误：聊天消息缺少payload字段 ===");
-                sendSimpleErrorMessage(session, "聊天消息缺少payload字段");
+            Map<String, Object> originalPayload = extractChatPayload(messageMap);
+            if (originalPayload == null || originalPayload.isEmpty()) {
+                System.out.println("=== 错误：聊天消息缺少有效payload ===");
+                sendSimpleErrorMessage(session, "聊天消息缺少有效payload");
                 return;
             }
-            
-            Map<String, Object> originalPayload = (Map<String, Object>) messageMap.get("payload");
             System.out.println("=== 收到原始payload，包含字段数: " + originalPayload.size() + " ===");
             
             String imageData = null;
@@ -474,6 +514,42 @@ public class NativeWebSocketController {
                 String content = originalPayload.get("content").toString();
                 processedPayload.put("message", content);
             }
+
+            String normalizedVoiceUrl = normalizeUploadUrl(firstNonBlank(
+                    processedPayload.get("voiceUrl"),
+                    processedPayload.get("audioUrl"),
+                    processedPayload.get("recordUrl"),
+                    processedPayload.get("mediaUrl"),
+                    processedPayload.get("voice")));
+            if (normalizedVoiceUrl != null) {
+                processedPayload.put("voiceUrl", normalizedVoiceUrl);
+                processedPayload.put("audioUrl", normalizedVoiceUrl);
+                processedPayload.put("recordUrl", normalizedVoiceUrl);
+                processedPayload.put("mediaUrl", normalizedVoiceUrl);
+                processedPayload.put("voice", normalizedVoiceUrl);
+            }
+
+            String chatMessageType = processedPayload.get("messageType");
+            if (chatMessageType == null || chatMessageType.isBlank()) {
+                if (normalizedVoiceUrl != null) {
+                    chatMessageType = "voice";
+                } else if (processedPayload.containsKey("imageUrl")) {
+                    chatMessageType = "image";
+                } else {
+                    chatMessageType = "text";
+                }
+                processedPayload.put("messageType", chatMessageType);
+            }
+
+            if ("voice".equals(chatMessageType)) {
+                if (normalizedVoiceUrl != null) {
+                    processedPayload.put("voiceUrl", normalizedVoiceUrl);
+                    processedPayload.put("audioUrl", normalizedVoiceUrl);
+                    processedPayload.put("recordUrl", normalizedVoiceUrl);
+                    processedPayload.put("mediaUrl", normalizedVoiceUrl);
+                    processedPayload.put("voice", normalizedVoiceUrl);
+                }
+            }
             
             Map<String, Object> response = new HashMap<>();
             response.put("type", "chat");
@@ -482,7 +558,13 @@ public class NativeWebSocketController {
             String chatJson = objectMapper.writeValueAsString(response);
             broadcastMessage(chatJson);
             
-            if (chatMessageService != null && (processedPayload.containsKey("message") || processedPayload.containsKey("imageUrl"))) {
+            if (chatMessageService != null && (
+                    processedPayload.containsKey("message") ||
+                    processedPayload.containsKey("imageUrl") ||
+                    processedPayload.containsKey("voiceUrl") ||
+                    processedPayload.containsKey("audioUrl") ||
+                    processedPayload.containsKey("recordUrl") ||
+                    processedPayload.containsKey("mediaUrl"))) {
                 try {
                     String username = processedPayload.getOrDefault("username", "匿名用户");
                     chatMessageService.saveMessage(
@@ -490,7 +572,13 @@ public class NativeWebSocketController {
                             username,
                             processedPayload.get("message"),
                             avatarUrl,
-                            processedPayload.get("imageUrl"));
+                            processedPayload.get("imageUrl"),
+                            processedPayload.get("voiceUrl"),
+                            processedPayload.get("audioUrl"),
+                            processedPayload.get("recordUrl"),
+                            processedPayload.get("mediaUrl"),
+                            processedPayload.get("messageType"),
+                            parseDuration(processedPayload.get("duration")));
                 } catch (Exception e) {
                     System.out.println("=== 保存聊天记录失败: " + e.getMessage() + " ===");
                 }
@@ -503,6 +591,32 @@ public class NativeWebSocketController {
             e.printStackTrace();
             sendSimpleErrorMessage(session, "处理消息失败: " + e.getMessage());
         }
+    }
+
+    private Map<String, Object> extractChatPayload(Map<String, Object> messageMap) {
+        if (messageMap == null) {
+            return null;
+        }
+
+        Object payloadObj = messageMap.get("payload");
+        if (payloadObj instanceof Map<?, ?> payloadMap) {
+            Map<String, Object> normalizedPayload = new HashMap<>();
+            for (Map.Entry<?, ?> entry : payloadMap.entrySet()) {
+                if (entry.getKey() != null) {
+                    normalizedPayload.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
+            }
+            return normalizedPayload;
+        }
+
+        Map<String, Object> fallbackPayload = new HashMap<>();
+        for (Map.Entry<String, Object> entry : messageMap.entrySet()) {
+            String key = entry.getKey();
+            if (!"type".equals(key) && entry.getValue() != null) {
+                fallbackPayload.put(key, entry.getValue());
+            }
+        }
+        return fallbackPayload;
     }
     
     private void sendSimpleErrorMessage(Session session, String errorMessage) {
@@ -572,7 +686,7 @@ public class NativeWebSocketController {
                     System.out.println("[广播] 移除无效会话失败: " + e.getMessage());
                 }
             }
-            onlineCount.set(Math.max(0, onlineCount.get() - sessionsToRemove.size()));
+            onlineCount.set(webSocketSet.size());
         }
         
         System.out.println("[广播结束] 消息广播完成");
@@ -593,6 +707,29 @@ public class NativeWebSocketController {
                 imageData.startsWith("/uploads/") ||
                 imageData.startsWith("http://") ||
                 imageData.startsWith("https://"));
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private Integer parseDuration(String durationValue) {
+        if (durationValue == null || durationValue.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(durationValue);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
     
 
