@@ -276,13 +276,6 @@ public class MenuService {
             Object sortObj = row.get("sort");
             if (sortObj instanceof Number) menu.setSort(((Number) sortObj).intValue());
 
-            Object visObj = row.get("visible");
-            if (visObj instanceof Number) menu.setVisible(((Number) visObj).intValue());
-
-            Object stObj = row.get("status");
-            if (stObj instanceof Number) menu.setStatus(((Number) stObj).intValue());
-
-            menu.setPermission((String) row.get("permission"));
             return menu;
         }).filter(Objects::nonNull).collect(Collectors.toList());
     }
