@@ -38,21 +38,6 @@ public class Menu {
     @Column(name = "sort", nullable = false)
     private Integer sort;
 
-    @Column(name = "visible")
-    private Integer visible;
-
-    @Column(name = "status")
-    private Integer status;
-
-    @Column(name = "permission", length = 128)
-    private String permission;
-
-    @Column(name = "create_time")
-    private Date createTime;
-
-    @Column(name = "update_time")
-    private Date updateTime;
-
     @Transient
     private List<Menu> children;
 
