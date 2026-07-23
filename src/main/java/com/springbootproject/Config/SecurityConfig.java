@@ -61,7 +61,9 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .exceptionHandling(exception -> exception.authenticationEntryPoint(unauthorizedHandler))
             .authorizeHttpRequests(authorize -> authorize
+                .requestMatchers("/api/users/me").authenticated()
                 .anyRequest().permitAll()
             )
             .sessionManagement(session -> session
@@ -69,6 +71,7 @@ public class SecurityConfig {
             );
 
         http.headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
+        http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

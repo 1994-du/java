@@ -1,6 +1,7 @@
 package com.springbootproject.Controller;
 
 import com.springbootproject.Service.UploadStorageService;
+import com.springbootproject.Service.MenuService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -55,6 +56,9 @@ public class UserController {
     @Autowired
     private UploadStorageService uploadStorageService;
 
+    @Autowired
+    private MenuService menuService;
+
     // 通过用户名获取用户信息（需要JWT认证）
     @GetMapping("/{username}")
     public ResponseEntity<?> getUserByUsername(@PathVariable String username) {
@@ -76,15 +80,27 @@ public class UserController {
      */
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<Map<String, Object>>> getCurrentUser() {
-        // 从SecurityContext中获取当前认证的用户信息
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        
-        String username = authentication.getName();
-        
-        // 构建响应数据
+        boolean isAuthenticated = authentication != null && authentication.isAuthenticated()
+                && !(authentication instanceof AnonymousAuthenticationToken);
+
+        if (!isAuthenticated) {
+            return ResponseEntity.status(401).body(ApiResponse.error("未登录或token无效"));
+        }
+
+        User user = userService.findUserByUsername(authentication.getName());
+        if (user == null) {
+            return ResponseEntity.status(404).body(ApiResponse.error("当前用户不存在"));
+        }
+
         Map<String, Object> data = new HashMap<>();
-        data.put("username", username);
-        
+        data.put("username", user.getUsername());
+        data.put("avatar", user.getAvatar());
+        data.put("roleId", user.getRoleId());
+        data.put("roleName", user.getRoleName());
+        data.put("gender", user.getGender());
+        data.put("menus", user.getRoleId() != null ? menuService.getMenusByRoleId(user.getRoleId()) : new ArrayList<>());
+
         return ResponseEntity.ok(ApiResponse.success("获取当前用户信息成功", data));
     }
     

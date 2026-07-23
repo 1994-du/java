@@ -41,6 +41,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     // 从请求中获取JWT token
     private String getJwtFromRequest(HttpServletRequest request) {
+        String authorizationHeader = request.getHeader("Authorization");
+        if (authorizationHeader != null && !authorizationHeader.trim().isEmpty()) {
+            if (authorizationHeader.startsWith("Bearer ")) {
+                return authorizationHeader.substring(7).trim();
+            }
+            return authorizationHeader.trim();
+        }
+
+        String tokenHeader = request.getHeader("token");
+        if (tokenHeader != null && !tokenHeader.trim().isEmpty()) {
+            return tokenHeader.trim();
+        }
+
+        String userTokenHeader = request.getHeader("user-token");
+        if (userTokenHeader != null && !userTokenHeader.trim().isEmpty()) {
+            return userTokenHeader.trim();
+        }
+
         // 从Cookie中获取token
         Cookie[] cookies = request.getCookies();
         if (cookies != null) {
@@ -58,7 +76,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         try {
             String jwt = getJwtFromRequest(request);
-            if (jwt != null && jwtUtils.validateToken(jwt)) {
+            if (jwt != null
+                    && SecurityContextHolder.getContext().getAuthentication() == null
+                    && jwtUtils.validateToken(jwt)) {
                 String username = jwtUtils.extractUsername(jwt);
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
