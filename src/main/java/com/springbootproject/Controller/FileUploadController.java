@@ -2,7 +2,6 @@ package com.springbootproject.Controller;
 
 import com.springbootproject.Model.ApiResponse;
 import com.springbootproject.Service.UploadStorageService;
-import com.springbootproject.Service.WpsService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,14 +28,9 @@ public class FileUploadController {
     private static final String[] ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx", ".txt", ".xlsx", ".xls", ".pptx", ".ppt"};
     private static final String[] IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"};
     private static final String[] CHAT_UPLOAD_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".webm"};
-    // WPS支持的文档类型
-    private static final String[] WPS_EXTENSIONS = {".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".pdf", ".txt"};
 
     @Autowired
     private UploadStorageService uploadStorageService;
-
-    @Autowired
-    private WpsService wpsService;
 
     @PostMapping(value = "/api/file/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadFile(@RequestParam("file") MultipartFile file) {
@@ -237,42 +231,4 @@ public class FileUploadController {
         return prefix + uuid + extension;
     }
 
-    /**
-     * 上传文件并自动上传到WPS
-     */
-    @PostMapping(value = "/api/file/upload-wps", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> uploadFileToWps(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "userId", required = false) Long userId,
-            @RequestParam(value = "uploadToWps", defaultValue = "true") boolean uploadToWps) {
-        try {
-            validateFile(file);
-
-            String originalFilename = file.getOriginalFilename();
-            String fileExtension = getFileExtension(originalFilename).toLowerCase();
-            
-            if (!isWpsExtension(fileExtension)) {
-                return ResponseEntity.badRequest().body(ApiResponse.error("不支持的文件类型，仅支持: .doc, .docx, .xls, .xlsx, .ppt, .pptx, .pdf, .txt"));
-            }
-
-            if (uploadToWps) {
-                // 上传到WPS
-                Map<String, Object> result = wpsService.uploadToWps(file, userId);
-                return ResponseEntity.ok(ApiResponse.success("文件上传成功（WPS）", result));
-            } else {
-                // 只上传到本地
-                Map<String, Object> data = saveFile(file, fileExtension, "file_");
-                return ResponseEntity.ok(ApiResponse.success("文件上传成功", data));
-            }
-        } catch (Exception e) {
-            System.out.println("=== WPS文件上传失败 ===");
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(ApiResponse.error("文件上传失败: " + e.getMessage()));
-        }
-    }
-
-    // 检查是否是WPS支持的文件扩展名
-    private boolean isWpsExtension(String extension) {
-        return Arrays.asList(WPS_EXTENSIONS).contains(extension);
-    }
 }
