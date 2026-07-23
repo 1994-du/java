@@ -32,24 +32,6 @@ import java.util.Map;
 @RequestMapping("/api/users")
 public class UserController {
     
-    // 测试认证状态的端点
-    @GetMapping("/test-auth")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> testAuth() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        boolean isAuthenticated = authentication != null && authentication.isAuthenticated() && 
-                                 !(authentication instanceof AnonymousAuthenticationToken);
-        
-        Map<String, Object> data = new HashMap<>();
-        data.put("isAuthenticated", isAuthenticated);
-        data.put("authentication", authentication != null ? authentication.toString() : "null");
-        data.put("username", isAuthenticated ? authentication.getName() : "未认证");
-        
-        System.out.println("测试认证状态 - 已认证: " + isAuthenticated + ", 用户: " + 
-                          (isAuthenticated ? authentication.getName() : "未认证"));
-        
-        return ResponseEntity.ok(ApiResponse.success("认证状态测试", data));
-    }
-
     @Autowired  // 自动注入 UserService
     private UserService userService;
 
