@@ -39,6 +39,7 @@ public class NativeWebSocketController {
     private static final AtomicInteger onlineCount = new AtomicInteger(0);
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final ConcurrentHashMap<Long, Map<String, Object>> onlineUsers = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Long, String> onlineUserSessions = new ConcurrentHashMap<>();
     
     @OnOpen
     public void onOpen(Session session) {
@@ -54,36 +55,49 @@ public class NativeWebSocketController {
     
     private void sendOnlineUsersList(Session session) {
         try {
-            List<Map<String, Object>> usersList = new ArrayList<>();
-            for (Map<String, Object> userInfo : onlineUsers.values()) {
-                Map<String, Object> userWithAvatar = new HashMap<>(userInfo);
-                
-                if (userInfo.containsKey("userId") && userService != null) {
-                    try {
-                        Long uid = Long.parseLong(userInfo.get("userId").toString());
-                        userWithAvatar.put("avatar", getLatestAvatarByUserId(uid));
-                    } catch (Exception e) {
-                        userWithAvatar.put("avatar", "/uploads/avatars/default.png");
-                    }
-                } else {
-                    userWithAvatar.put("avatar", "/uploads/avatars/default.png");
-                }
-                
-                usersList.add(userWithAvatar);
-            }
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("type", "onlineUsers");
-            response.put("payload", usersList);
-            
-            String json = objectMapper.writeValueAsString(response);
+            String json = buildOnlineUsersListJson();
             session.getBasicRemote().sendText(json);
-            System.out.println("=== 发送在线用户列表，数量: " + usersList.size() + " ===");
+            System.out.println("=== 发送在线用户列表，数量: " + onlineUsers.size() + " ===");
             
             sendRecentChatHistory(session);
         } catch (Exception e) {
             System.out.println("=== 发送在线用户列表失败: " + e.getMessage() + " ===");
         }
+    }
+
+    private void broadcastOnlineUsersList() {
+        try {
+            String json = buildOnlineUsersListJson();
+            broadcastMessage(json);
+            System.out.println("=== 已广播最新在线用户列表，数量: " + onlineUsers.size() + " ===");
+        } catch (Exception e) {
+            System.out.println("=== 广播在线用户列表失败: " + e.getMessage() + " ===");
+        }
+    }
+
+    private String buildOnlineUsersListJson() throws IOException {
+        List<Map<String, Object>> usersList = new ArrayList<>();
+        for (Map<String, Object> userInfo : onlineUsers.values()) {
+            Map<String, Object> userWithAvatar = new HashMap<>(userInfo);
+
+            if (userInfo.containsKey("userId") && userService != null) {
+                try {
+                    Long uid = Long.parseLong(userInfo.get("userId").toString());
+                    userWithAvatar.put("avatar", getLatestAvatarByUserId(uid));
+                } catch (Exception e) {
+                    userWithAvatar.put("avatar", "/uploads/avatars/default.png");
+                }
+            } else {
+                userWithAvatar.put("avatar", "/uploads/avatars/default.png");
+            }
+
+            usersList.add(userWithAvatar);
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("type", "onlineUsers");
+        response.put("payload", usersList);
+        return objectMapper.writeValueAsString(response);
     }
     
     private void sendRecentChatHistory(Session session) {
@@ -159,9 +173,21 @@ public class NativeWebSocketController {
         System.out.println("连接关闭");
         
         if (session != null) {
+            Long userId = getSessionUserId(session);
+            String sessionUsername = getSessionUsername(session);
             webSocketSet.remove(session);
             onlineCount.set(webSocketSet.size());
             System.out.println("在线人数减少为: " + onlineCount.get());
+
+            Map<String, Object> removedUser = removeOnlineUser(session, userId);
+            if (removedUser != null) {
+                String username = getStringValue(removedUser.get("username"));
+                if (username == null) {
+                    username = sessionUsername != null ? sessionUsername : "匿名用户";
+                }
+                broadcastUserOffline(userId, username);
+                broadcastOnlineUsersList();
+            }
         }
     }
     
@@ -298,6 +324,7 @@ public class NativeWebSocketController {
                 session.getUserProperties().put("username", username);
                 if (userId != null) {
                     session.getUserProperties().put("userId", userId);
+                    onlineUserSessions.put(userId, session.getId());
                 }
                 System.out.println("=== 成功设置用户属性: " + username + " ===");
             }
@@ -346,37 +373,30 @@ public class NativeWebSocketController {
             }
             
             Map<String, Object> payload = (Map<String, Object>) messageMap.get("payload");
-            String username = payload.getOrDefault("username", "匿名用户").toString();
-            
-            Long userId = null;
-            if (payload.containsKey("userId")) {
-                try {
-                    userId = Long.parseLong(payload.get("userId").toString());
-                } catch (NumberFormatException e) {
-                    System.out.println("=== userId格式错误 ===");
-                }
+            Long userId = parseUserId(payload.get("userId"));
+            if (userId == null) {
+                userId = getSessionUserId(session);
             }
+
+            String username = getStringValue(payload.get("username"));
+            if (username == null) {
+                username = getSessionUsername(session);
+            }
+            if (username == null) {
+                username = "匿名用户";
+            }
+
             System.out.println("=== 接收到用户名: " + username + ", userId: " + userId + " ===");
-            
-            String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-            
-            Map<String, Object> responsePayload = new HashMap<>();
-            if (userId != null) {
-                responsePayload.put("userId", userId);
-                onlineUsers.remove(userId);
+
+            Map<String, Object> removedUser = removeOnlineUser(session, userId);
+            if (removedUser == null) {
+                System.out.println("=== 用户不在当前在线列表中，跳过重复下线广播 ===");
+                return;
             }
-            responsePayload.put("username", username);
-            responsePayload.put("time", time);
-            responsePayload.put("onlineCount", Math.max(0, onlineCount.get() - 1));
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("type", "userOffline");
-            response.put("payload", responsePayload);
-            
-            String broadcastJson = objectMapper.writeValueAsString(response);
-            System.out.println("=== 用户下线消息JSON: " + broadcastJson + " ===");
-            
-            broadcastMessage(broadcastJson);
+
+            String storedUsername = getStringValue(removedUser.get("username"));
+            broadcastUserOffline(userId, storedUsername != null ? storedUsername : username);
+            broadcastOnlineUsersList();
             
             System.out.println("=== 用户下线处理完成 ===");
             
@@ -387,14 +407,17 @@ public class NativeWebSocketController {
         }
     }
     
-    private void broadcastUserOffline(String username) {
+    private void broadcastUserOffline(Long userId, String username) {
         try {
             String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
             
             Map<String, Object> payload = new HashMap<>();
+            if (userId != null) {
+                payload.put("userId", userId);
+            }
             payload.put("username", username);
             payload.put("time", time);
-            payload.put("onlineCount", onlineCount.get());
+            payload.put("onlineCount", onlineUsers.size());
             
             Map<String, Object> response = new HashMap<>();
             response.put("type", "userOffline");
@@ -408,6 +431,69 @@ public class NativeWebSocketController {
         } catch (Exception e) {
             System.out.println("=== 广播用户下线失败: " + e.getMessage() + " ===");
         }
+    }
+
+    private Map<String, Object> removeOnlineUser(Session session, Long userId) {
+        Long effectiveUserId = userId != null ? userId : getSessionUserId(session);
+        if (effectiveUserId == null) {
+            clearSessionUser(session);
+            return null;
+        }
+
+        String sessionId = session != null ? session.getId() : null;
+        String mappedSessionId = onlineUserSessions.get(effectiveUserId);
+        if (sessionId != null && mappedSessionId != null && !sessionId.equals(mappedSessionId)) {
+            clearSessionUser(session);
+            return null;
+        }
+
+        Map<String, Object> removedUser = onlineUsers.remove(effectiveUserId);
+        if (mappedSessionId != null) {
+            onlineUserSessions.remove(effectiveUserId, mappedSessionId);
+        }
+        clearSessionUser(session);
+        return removedUser;
+    }
+
+    private Long getSessionUserId(Session session) {
+        if (session == null) {
+            return null;
+        }
+        return parseUserId(session.getUserProperties().get("userId"));
+    }
+
+    private String getSessionUsername(Session session) {
+        if (session == null) {
+            return null;
+        }
+        return getStringValue(session.getUserProperties().get("username"));
+    }
+
+    private void clearSessionUser(Session session) {
+        if (session != null) {
+            session.getUserProperties().remove("username");
+            session.getUserProperties().remove("userId");
+        }
+    }
+
+    private Long parseUserId(Object value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException e) {
+            System.out.println("=== userId格式错误 ===");
+            return null;
+        }
+    }
+
+    private String getStringValue(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String stringValue = value.toString().trim();
+        return stringValue.isEmpty() ? null : stringValue;
     }
     
     private void handleChatMessage(Map<String, Object> messageMap, Session session) {
