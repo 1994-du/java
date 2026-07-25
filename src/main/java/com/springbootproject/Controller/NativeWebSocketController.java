@@ -6,6 +6,7 @@ import com.springbootproject.Entity.ChatMessage;
 import com.springbootproject.Entity.User;
 import com.springbootproject.Service.ChatMessageService;
 import com.springbootproject.Service.UserService;
+import com.springbootproject.Util.JwtUtils;
 import jakarta.websocket.*;
 import jakarta.websocket.server.ServerEndpoint;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +25,7 @@ public class NativeWebSocketController {
     
     private static UserService userService;
     private static ChatMessageService chatMessageService;
+    private static JwtUtils jwtUtils;
     
     @Autowired
     public void setUserService(UserService userService) {
@@ -33,6 +35,11 @@ public class NativeWebSocketController {
     @Autowired
     public void setChatMessageService(ChatMessageService chatMessageService) {
         NativeWebSocketController.chatMessageService = chatMessageService;
+    }
+
+    @Autowired
+    public void setJwtUtils(JwtUtils jwtUtils) {
+        NativeWebSocketController.jwtUtils = jwtUtils;
     }
     
     private static final CopyOnWriteArraySet<Session> webSocketSet = new CopyOnWriteArraySet<>();
@@ -45,6 +52,9 @@ public class NativeWebSocketController {
     public void onOpen(Session session) {
         System.out.println("=== WebSocket新连接加入 ===");
         if (session != null) {
+            if (!ensureAuthenticatedSession(session)) {
+                return;
+            }
             webSocketSet.add(session);
             onlineCount.incrementAndGet();
             System.out.println("=== WebSocket在线人数增加为: " + onlineCount.get() + " ===");
@@ -251,6 +261,10 @@ public class NativeWebSocketController {
         System.out.println("[消息接收] 收到客户端消息，长度: " + message.length());
         
         try {
+            if (!ensureAuthenticatedSession(session)) {
+                return;
+            }
+
             if (message.length() > 1024 * 1024 * 5) {
                 System.out.println("[消息拒绝] 消息过大，发送错误提示");
                 sendSimpleErrorMessage(session, "消息过大，最大支持5MB");
@@ -307,25 +321,22 @@ public class NativeWebSocketController {
                 sendSimpleErrorMessage(session, "用户上线消息缺少payload字段");
                 return;
             }
-            
-            Map<String, Object> payload = (Map<String, Object>) messageMap.get("payload");
-            String username = payload.getOrDefault("username", "匿名用户").toString();
-            Long userId = null;
-            if (payload.containsKey("userId")) {
-                try {
-                    userId = Long.parseLong(payload.get("userId").toString());
-                } catch (NumberFormatException e) {
-                    System.out.println("=== userId格式错误 ===");
-                }
+
+            User authenticatedUser = getAuthenticatedUser(session);
+            if (authenticatedUser == null || authenticatedUser.getId() == null) {
+                rejectSession(session, "登录信息无效，请重新登录");
+                return;
             }
+
+            String username = authenticatedUser.getUsername();
+            Long userId = authenticatedUser.getId();
             System.out.println("=== 接收到用户名: " + username + ", userId: " + userId + " ===");
             
             if (session != null) {
+                session.getUserProperties().put("authUsername", username);
                 session.getUserProperties().put("username", username);
-                if (userId != null) {
-                    session.getUserProperties().put("userId", userId);
-                    onlineUserSessions.put(userId, session.getId());
-                }
+                session.getUserProperties().put("userId", userId);
+                onlineUserSessions.put(userId, session.getId());
                 System.out.println("=== 成功设置用户属性: " + username + " ===");
             }
             
@@ -371,17 +382,9 @@ public class NativeWebSocketController {
                 sendSimpleErrorMessage(session, "用户下线消息缺少payload字段");
                 return;
             }
-            
-            Map<String, Object> payload = (Map<String, Object>) messageMap.get("payload");
-            Long userId = parseUserId(payload.get("userId"));
-            if (userId == null) {
-                userId = getSessionUserId(session);
-            }
-
-            String username = getStringValue(payload.get("username"));
-            if (username == null) {
-                username = getSessionUsername(session);
-            }
+            User authenticatedUser = getAuthenticatedUser(session);
+            Long userId = authenticatedUser != null ? authenticatedUser.getId() : getSessionUserId(session);
+            String username = authenticatedUser != null ? authenticatedUser.getUsername() : getSessionUsername(session);
             if (username == null) {
                 username = "匿名用户";
             }
@@ -499,6 +502,12 @@ public class NativeWebSocketController {
     private void handleChatMessage(Map<String, Object> messageMap, Session session) {
         System.out.println("=== 开始处理聊天消息 ===");
         try {
+            User authenticatedUser = getAuthenticatedUser(session);
+            if (authenticatedUser == null || authenticatedUser.getId() == null) {
+                rejectSession(session, "登录信息无效，请重新登录");
+                return;
+            }
+
             Map<String, Object> originalPayload = extractChatPayload(messageMap);
             if (originalPayload == null || originalPayload.isEmpty()) {
                 System.out.println("=== 错误：聊天消息缺少有效payload ===");
@@ -530,39 +539,24 @@ public class NativeWebSocketController {
             
             Map<String, String> processedPayload = new HashMap<>();
             
-            Long chatUserId = null;
             for (Map.Entry<String, Object> entry : originalPayload.entrySet()) {
                 String key = entry.getKey();
                 Object value = entry.getValue();
                 if (value != null) {
                     String stringValue = value.toString();
                     processedPayload.put(key, stringValue);
-                    if ("userId".equals(key) || "fromUserId".equals(key)) {
-                        try {
-                            chatUserId = Long.parseLong(stringValue);
-                        } catch (NumberFormatException e) {
-                            System.out.println("=== userId格式错误 ===");
-                        }
-                    }
                 }
             }
-            
-            if (chatUserId != null) {
-                processedPayload.put("userId", chatUserId.toString());
-            }
+
+            Long chatUserId = authenticatedUser.getId();
+            processedPayload.put("userId", chatUserId.toString());
             
             String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
             if (!processedPayload.containsKey("time")) {
                 processedPayload.put("time", time);
             }
-            
-            if (!processedPayload.containsKey("username")) {
-                String username = "匿名用户";
-                if (session != null && session.getUserProperties().containsKey("username")) {
-                    username = session.getUserProperties().get("username").toString();
-                }
-                processedPayload.put("username", username);
-            }
+
+            processedPayload.put("username", authenticatedUser.getUsername());
             
             String avatarUrl = "/uploads/avatars/default.png";
             if (chatUserId != null) {
@@ -816,6 +810,113 @@ public class NativeWebSocketController {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private boolean ensureAuthenticatedSession(Session session) {
+        if (session == null) {
+            return false;
+        }
+
+        String authError = getStringValue(session.getUserProperties().get("authError"));
+        if (authError != null) {
+            rejectSession(session, authError);
+            return false;
+        }
+
+        if (jwtUtils == null) {
+            rejectSession(session, "认证服务暂不可用");
+            return false;
+        }
+
+        String token = getStringValue(session.getUserProperties().get("authToken"));
+        if (token == null) {
+            rejectSession(session, "未登录或登录已失效");
+            return false;
+        }
+
+        if (!jwtUtils.validateToken(token)) {
+            rejectSession(session, "登录已过期，请重新登录");
+            return false;
+        }
+
+        String authenticatedUsername = getStringValue(jwtUtils.extractUsername(token));
+        if (authenticatedUsername == null) {
+            rejectSession(session, "登录信息无效，请重新登录");
+            return false;
+        }
+
+        session.getUserProperties().put("authUsername", authenticatedUsername);
+        session.getUserProperties().put("username", authenticatedUsername);
+        return true;
+    }
+
+    private User getAuthenticatedUser(Session session) {
+        String authenticatedUsername = getAuthenticatedUsername(session);
+        if (authenticatedUsername == null || userService == null) {
+            return null;
+        }
+        return userService.findUserByUsername(authenticatedUsername);
+    }
+
+    private String getAuthenticatedUsername(Session session) {
+        if (session == null) {
+            return null;
+        }
+        String authenticatedUsername = getStringValue(session.getUserProperties().get("authUsername"));
+        if (authenticatedUsername != null) {
+            return authenticatedUsername;
+        }
+        String token = getStringValue(session.getUserProperties().get("authToken"));
+        if (token == null || jwtUtils == null || !jwtUtils.validateToken(token)) {
+            return null;
+        }
+        authenticatedUsername = getStringValue(jwtUtils.extractUsername(token));
+        if (authenticatedUsername != null) {
+            session.getUserProperties().put("authUsername", authenticatedUsername);
+        }
+        return authenticatedUsername;
+    }
+
+    private void rejectSession(Session session, String errorMessage) {
+        sendSimpleErrorMessage(session, errorMessage);
+        closeUnauthorizedSession(session, errorMessage);
+    }
+
+    private void closeUnauthorizedSession(Session session, String reason) {
+        if (session == null) {
+            return;
+        }
+
+        Long userId = getSessionUserId(session);
+        String sessionUsername = getSessionUsername(session);
+
+        webSocketSet.remove(session);
+        onlineCount.set(webSocketSet.size());
+
+        Map<String, Object> removedUser = removeOnlineUser(session, userId);
+        if (removedUser != null) {
+            String username = getStringValue(removedUser.get("username"));
+            if (username == null) {
+                username = sessionUsername != null ? sessionUsername : "匿名用户";
+            }
+            broadcastUserOffline(userId, username);
+            broadcastOnlineUsersList();
+        }
+
+        try {
+            if (session.isOpen()) {
+                session.close(new CloseReason(CloseReason.CloseCodes.VIOLATED_POLICY, abbreviateCloseReason(reason)));
+            }
+        } catch (IOException e) {
+            System.out.println("=== 关闭未授权WebSocket连接失败: " + e.getMessage() + " ===");
+        }
+    }
+
+    private String abbreviateCloseReason(String reason) {
+        if (reason == null || reason.isBlank()) {
+            return "Unauthorized";
+        }
+        return reason.length() > 100 ? reason.substring(0, 100) : reason;
     }
     
 
