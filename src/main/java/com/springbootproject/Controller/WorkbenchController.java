@@ -1,10 +1,12 @@
 package com.springbootproject.Controller;
 
+import com.springbootproject.Entity.Role;
 import com.springbootproject.Entity.User;
 import com.springbootproject.Model.ApiResponse;
 import com.springbootproject.Model.WorkbenchAppResponse;
 import com.springbootproject.Model.WorkbenchRequest;
 import com.springbootproject.Model.WorkbenchResponse;
+import com.springbootproject.Repository.RoleRepository;
 import com.springbootproject.Service.WorkbenchService;
 import com.springbootproject.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +30,9 @@ public class WorkbenchController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private RoleRepository roleRepository;
 
     /**
      * 获取所有工作台列表（管理员）
@@ -163,6 +168,16 @@ public class WorkbenchController {
     }
 
     private boolean isAdmin(User user) {
-        return user != null && user.getRoleId() != null && user.getRoleId().equals(1L);
+        if (user == null || user.getRoleId() == null) {
+            return false;
+        }
+
+        Role adminRole = roleRepository.findByName("管理员");
+        if (adminRole != null && user.getRoleId().equals(adminRole.getId())) {
+            return true;
+        }
+
+        Role superAdminRole = roleRepository.findByName("超级管理员");
+        return superAdminRole != null && user.getRoleId().equals(superAdminRole.getId());
     }
 }
