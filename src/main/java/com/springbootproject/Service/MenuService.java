@@ -26,7 +26,7 @@ public class MenuService {
     private JdbcTemplate jdbcTemplate;
 
     // 直接内存缓存，避免重复解析角色菜单
-    private final Map<Long, List<Menu>> menuCache = new ConcurrentHashMap<>();
+    private final Map<Long, CachedMenuTree> menuCache = new ConcurrentHashMap<>();
 
     public List<Menu> getAllMenus() {
         return menuRepository.findAll();
@@ -138,12 +138,17 @@ public class MenuService {
             return new ArrayList<>();
         }
 
-        List<Menu> cached = menuCache.get(roleId);
-        if (cached != null) {
-            return cloneMenuTree(cached);
+        String menusValue = loadRoleMenusByRoleId(roleId);
+        if (menusValue == null || menusValue.trim().isEmpty()) {
+            return new ArrayList<>();
         }
 
-        List<Long> selectedMenuIds = loadMenuIdsByRoleId(roleId);
+        CachedMenuTree cached = menuCache.get(roleId);
+        if (cached != null && Objects.equals(cached.getMenusValue(), menusValue)) {
+            return cloneMenuTree(cached.getMenuTree());
+        }
+
+        List<Long> selectedMenuIds = parseMenuIds(menusValue);
         if (selectedMenuIds.isEmpty()) {
             return new ArrayList<>();
         }
@@ -158,7 +163,7 @@ public class MenuService {
         }
 
         List<Menu> menuTree = buildMenuTree(new ArrayList<>(accessibleMenus.values()), 0L);
-        menuCache.put(roleId, cloneMenuTree(menuTree));
+        menuCache.put(roleId, new CachedMenuTree(menusValue, cloneMenuTree(menuTree)));
         return cloneMenuTree(menuTree);
     }
 
@@ -181,13 +186,32 @@ public class MenuService {
         menuCache.clear();
     }
 
-    private List<Long> loadMenuIdsByRoleId(Long roleId) {
+    private String loadRoleMenusByRoleId(Long roleId) {
         try {
             Map<String, Object> roleMap = jdbcTemplate.queryForMap(
                     "SELECT menus FROM sys_roles WHERE id = ?", roleId);
-            return parseMenuIds(roleMap.get("menus"));
+            Object menus = roleMap.get("menus");
+            return menus == null ? null : menus.toString();
         } catch (Exception e) {
-            return new ArrayList<>();
+            return null;
+        }
+    }
+
+    private static class CachedMenuTree {
+        private final String menusValue;
+        private final List<Menu> menuTree;
+
+        private CachedMenuTree(String menusValue, List<Menu> menuTree) {
+            this.menusValue = menusValue;
+            this.menuTree = menuTree;
+        }
+
+        private String getMenusValue() {
+            return menusValue;
+        }
+
+        private List<Menu> getMenuTree() {
+            return menuTree;
         }
     }
 
