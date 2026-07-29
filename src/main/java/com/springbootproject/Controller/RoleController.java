@@ -1,6 +1,7 @@
 package com.springbootproject.Controller;
 
 import com.springbootproject.Model.ApiResponse;
+import com.springbootproject.Service.MenuService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,9 @@ import java.util.Map;
 public class RoleController {
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private MenuService menuService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -229,6 +233,7 @@ public class RoleController {
 
                 int rowsAffected = stmt.executeUpdate();
                 if (rowsAffected > 0) {
+                    menuService.clearMenuCache();
                     return ResponseEntity.ok(ApiResponse.success("更新角色成功", null));
                 } else {
                     return ResponseEntity.badRequest().body(ApiResponse.error("角色不存在"));
@@ -282,6 +287,7 @@ public class RoleController {
 
                 int rowsAffected = stmt.executeUpdate();
                 if (rowsAffected > 0) {
+                    menuService.clearMenuCache();
                     return ResponseEntity.ok(ApiResponse.success("添加角色成功", null));
                 } else {
                     return ResponseEntity.status(500).body(ApiResponse.error("添加角色失败"));
@@ -321,6 +327,7 @@ public class RoleController {
 
                 int rowsAffected = stmt.executeUpdate();
                 if (rowsAffected > 0) {
+                    menuService.clearMenuCache();
                     return ResponseEntity.ok(ApiResponse.success("删除角色成功", null));
                 } else {
                     return ResponseEntity.badRequest().body(ApiResponse.error("角色不存在"));
