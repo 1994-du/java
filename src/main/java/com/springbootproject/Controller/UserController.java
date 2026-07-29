@@ -1,7 +1,9 @@
 package com.springbootproject.Controller;
 
+import com.springbootproject.Entity.Role;
 import com.springbootproject.Service.UploadStorageService;
 import com.springbootproject.Service.MenuService;
+import com.springbootproject.Repository.RoleRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -40,6 +42,9 @@ public class UserController {
 
     @Autowired
     private MenuService menuService;
+
+    @Autowired
+    private RoleRepository roleRepository;
 
     // 通过用户名获取用户信息（需要JWT认证）
     @GetMapping("/{username}")
@@ -80,10 +85,25 @@ public class UserController {
         data.put("avatar", user.getAvatar());
         data.put("roleId", user.getRoleId());
         data.put("roleName", user.getRoleName());
+        data.put("isAdmin", isAdmin(user));
         data.put("gender", user.getGender());
         data.put("menus", user.getRoleId() != null ? menuService.getMenusByRoleId(user.getRoleId()) : new ArrayList<>());
 
         return ResponseEntity.ok(ApiResponse.success("获取当前用户信息成功", data));
+    }
+
+    private boolean isAdmin(User user) {
+        if (user == null || user.getRoleId() == null) {
+            return false;
+        }
+
+        Role adminRole = roleRepository.findByName("管理员");
+        if (adminRole != null && user.getRoleId().equals(adminRole.getId())) {
+            return true;
+        }
+
+        Role superAdminRole = roleRepository.findByName("超级管理员");
+        return superAdminRole != null && user.getRoleId().equals(superAdminRole.getId());
     }
     
     /**
