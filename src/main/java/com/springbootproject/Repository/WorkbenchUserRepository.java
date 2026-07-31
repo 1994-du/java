@@ -2,6 +2,9 @@ package com.springbootproject.Repository;
 
 import com.springbootproject.Entity.WorkbenchUser;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -19,5 +22,7 @@ public interface WorkbenchUserRepository extends JpaRepository<WorkbenchUser, Lo
 
     List<WorkbenchUser> findByUserId(Long userId);
 
-    void deleteByWorkbenchId(Long workbenchId);
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from WorkbenchUser wu where wu.workbenchId = :workbenchId")
+    void deleteByWorkbenchId(@Param("workbenchId") Long workbenchId);
 }

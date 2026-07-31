@@ -226,9 +226,13 @@ public class WorkbenchService {
             return;
         }
 
+        List<Long> normalizedUserIds = normalizeUserIds(userIds);
+        if (isSameWorkbenchUsers(workbenchId, normalizedUserIds)) {
+            return;
+        }
+
         workbenchUserRepository.deleteByWorkbenchId(workbenchId);
 
-        List<Long> normalizedUserIds = normalizeUserIds(userIds);
         if (normalizedUserIds.isEmpty()) {
             return;
         }
@@ -254,6 +258,22 @@ public class WorkbenchService {
             }
         }
         return new ArrayList<>(normalized);
+    }
+
+    private boolean isSameWorkbenchUsers(Long workbenchId, List<Long> normalizedUserIds) {
+        List<WorkbenchUser> existingRelations = workbenchUserRepository.findByWorkbenchId(workbenchId);
+        if (existingRelations.isEmpty()) {
+            return normalizedUserIds.isEmpty();
+        }
+
+        Set<Long> existingUserIds = new LinkedHashSet<>();
+        for (WorkbenchUser relation : existingRelations) {
+            if (relation.getUserId() != null) {
+                existingUserIds.add(relation.getUserId());
+            }
+        }
+
+        return existingUserIds.equals(new LinkedHashSet<>(normalizedUserIds));
     }
 
     private void validateUsersExist(List<Long> userIds) {
