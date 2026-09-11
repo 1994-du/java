@@ -28,8 +28,8 @@ public class AuthController {
     private final MenuService menuService;
 
     public AuthController(UserService userService,
-                          JwtUtils jwtUtils,
-                          MenuService menuService) {
+            JwtUtils jwtUtils,
+            MenuService menuService) {
         this.userService = userService;
         this.jwtUtils = jwtUtils;
         this.menuService = menuService;
@@ -42,15 +42,15 @@ public class AuthController {
 
     @PostMapping("/app/login")
     public ResponseEntity<?> appLogin(@RequestBody Map<String, Object> loginRequest,
-                                      HttpServletRequest request,
-                                      HttpServletResponse response) {
+            HttpServletRequest request,
+            HttpServletResponse response) {
         return doLogin(loginRequest, response, request, "user-token");
     }
 
     private ResponseEntity<?> doLogin(Map<String, Object> loginRequest,
-                                      HttpServletResponse response,
-                                      HttpServletRequest request,
-                                      String cookieName) {
+            HttpServletResponse response,
+            HttpServletRequest request,
+            String cookieName) {
         if (loginRequest == null) {
             return ResponseEntity.badRequest().body(ApiResponse.error("请求数据不能为空"));
         }
@@ -93,7 +93,8 @@ public class AuthController {
         String password = (String) registerRequest.get("password");
         String gender = (String) registerRequest.get("gender");
 
-        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty() || password.length() < 6) {
+        if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()
+                || password.length() < 6) {
             return ResponseEntity.badRequest().body(ApiResponse.error("用户名不能为空，密码不能为空且长度不能少于6位"));
         }
 
@@ -125,7 +126,8 @@ public class AuthController {
         String username = (String) resetPasswordRequest.get("username");
         String newPassword = (String) resetPasswordRequest.get("newPassword");
 
-        if (username == null || username.trim().isEmpty() || newPassword == null || newPassword.trim().isEmpty() || newPassword.length() < 6) {
+        if (username == null || username.trim().isEmpty() || newPassword == null || newPassword.trim().isEmpty()
+                || newPassword.length() < 6) {
             return ResponseEntity.badRequest().body(ApiResponse.error("用户名不能为空，新密码不能为空且长度不能少于6位"));
         }
 

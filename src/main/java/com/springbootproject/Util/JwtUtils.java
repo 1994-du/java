@@ -19,14 +19,14 @@ import java.util.function.Function;
 
 @Component
 public class JwtUtils {
-    
+
     private final SecretKey jwtSecretKey;
-    
+
     // JWT过期时间（毫秒），这里设置为2小时
     private final int jwtExpirationMs;
 
     public JwtUtils(@Value("${app.security.jwt-secret}") String jwtSecret,
-                    @Value("${app.security.jwt-expiration-ms:7200000}") int jwtExpirationMs) {
+            @Value("${app.security.jwt-expiration-ms:7200000}") int jwtExpirationMs) {
         if (jwtSecret == null || jwtSecret.length() < 64) {
             throw new IllegalArgumentException("app.security.jwt-secret must contain at least 64 characters");
         }
@@ -106,31 +106,32 @@ public class JwtUtils {
             return null;
         }
     }
-    
+
     /**
      * 验证token是否有效（不需要username参数）
      */
     public Boolean validateToken(String token) {
         try {
-            System.out.println("开始验证token: " + (token != null && token.length() > 0 ? token.substring(0, 20) + "..." : "null"));
-            
+            System.out.println(
+                    "开始验证token: " + (token != null && token.length() > 0 ? token.substring(0, 20) + "..." : "null"));
+
             // 先检查token是否为空
             if (token == null || token.isEmpty()) {
                 System.out.println("Token为空，验证失败");
                 return false;
             }
-            
+
             // 验证token签名和格式
             Claims claims = Jwts.parserBuilder()
                     .setSigningKey(jwtSecretKey)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
-            
+
             // 检查token是否过期
             boolean isExpired = isTokenExpired(token);
             System.out.println("Token验证结果 - 过期: " + isExpired + ", 用户名: " + claims.getSubject());
-            
+
             return !isExpired;
         } catch (SignatureException e) {
             System.out.println("Token签名验证失败: " + e.getMessage());
@@ -148,7 +149,7 @@ public class JwtUtils {
         }
         return false;
     }
-    
+
     /**
      * 验证token是否有效（兼容旧方法）
      */

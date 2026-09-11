@@ -17,9 +17,9 @@ public class DataInitializer implements CommandLineRunner {
     private final String initialAdminPassword;
 
     public DataInitializer(UserRepository userRepository,
-                           PasswordEncoder passwordEncoder,
-                           MenuService menuService,
-                           @Value("${app.initial-admin-password:}") String initialAdminPassword) {
+            PasswordEncoder passwordEncoder,
+            MenuService menuService,
+            @Value("${app.initial-admin-password:}") String initialAdminPassword) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.menuService = menuService;
@@ -38,7 +38,7 @@ public class DataInitializer implements CommandLineRunner {
             adminUser.setRoleName("超级管理员");
             adminUser.setAvatar("/uploads/avatars/default.jpeg");
             adminUser.setGender("男");
-            
+
             userRepository.save(adminUser);
         }
 

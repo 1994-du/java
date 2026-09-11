@@ -125,7 +125,8 @@ public class RoleService {
             return new ArrayList<>();
         }
         try {
-            return objectMapper.readValue(menus, new TypeReference<>() {});
+            return objectMapper.readValue(menus, new TypeReference<>() {
+            });
         } catch (JsonProcessingException exception) {
             return new ArrayList<>();
         }
@@ -133,7 +134,8 @@ public class RoleService {
 
     private String toMenusJson(Object menus) {
         try {
-            List<Integer> menuIds = objectMapper.convertValue(menus, new TypeReference<>() {});
+            List<Integer> menuIds = objectMapper.convertValue(menus, new TypeReference<>() {
+            });
             return objectMapper.writeValueAsString(menuIds);
         } catch (IllegalArgumentException | JsonProcessingException exception) {
             throw new IllegalArgumentException("menus字段格式错误", exception);

@@ -8,9 +8,9 @@ import org.springframework.data.domain.Pageable;
 
 @Repository
 public interface RoleRepository extends JpaRepository<Role, Long> {
-    
+
     Role findByName(String name);
-    
+
     boolean existsByName(String name);
 
     Page<Role> findByNameContaining(String name, Pageable pageable);

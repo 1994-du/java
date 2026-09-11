@@ -26,8 +26,8 @@ public class MenuService {
     private final ObjectMapper objectMapper;
 
     public MenuService(MenuRepository menuRepository,
-                       RoleRepository roleRepository,
-                       ObjectMapper objectMapper) {
+            RoleRepository roleRepository,
+            ObjectMapper objectMapper) {
         this.menuRepository = menuRepository;
         this.roleRepository = roleRepository;
         this.objectMapper = objectMapper;
@@ -164,8 +164,8 @@ public class MenuService {
         Map<Long, Menu> allMenusMap = menuRepository.findAll().stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.toMap(menu -> Objects.requireNonNull(menu.getId()),
-                    menu -> cloneMenuNode(Objects.requireNonNull(menu)),
-                    (left, right) -> left, LinkedHashMap::new));
+                        menu -> cloneMenuNode(Objects.requireNonNull(menu)),
+                        (left, right) -> left, LinkedHashMap::new));
 
         LinkedHashMap<Long, Menu> accessibleMenus = new LinkedHashMap<>();
         for (Long menuId : selectedMenuIds) {
@@ -191,8 +191,8 @@ public class MenuService {
 
     private String loadRoleMenusByRoleId(Long roleId) {
         return roleRepository.findById(Objects.requireNonNull(roleId))
-            .map(role -> Objects.requireNonNull(role).getMenus())
-            .orElse(null);
+                .map(role -> Objects.requireNonNull(role).getMenus())
+                .orElse(null);
     }
 
     private static class CachedMenuTree {
@@ -280,9 +280,10 @@ public class MenuService {
 
             if (trimmed.startsWith("[")) {
                 try {
-                        return objectMapper.readValue(
+                    return objectMapper.readValue(
                             trimmed,
-                            new TypeReference<List<Long>>() {});
+                            new TypeReference<List<Long>>() {
+                            });
                 } catch (Exception ignored) {
                 }
             }
