@@ -6,9 +6,7 @@ import com.springbootproject.Model.ApiResponse;
 import com.springbootproject.Service.MenuService;
 import com.springbootproject.Service.UserService;
 import com.springbootproject.Util.JwtUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,17 +23,17 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
+    private final JwtUtils jwtUtils;
+    private final MenuService menuService;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private JwtUtils jwtUtils;
-
-    @Autowired
-    private MenuService menuService;
+    public AuthController(UserService userService,
+                          JwtUtils jwtUtils,
+                          MenuService menuService) {
+        this.userService = userService;
+        this.jwtUtils = jwtUtils;
+        this.menuService = menuService;
+    }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, Object> loginRequest, HttpServletResponse response) {

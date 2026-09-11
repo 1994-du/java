@@ -36,22 +36,6 @@ public class OrganizationController {
     }
     
     /**
-     * 获取组织树形结构
-     * @return 组织树形结构
-     */
-    @GetMapping("/tree")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getOrganizationTree() {
-        try {
-            List<Organization> organizations = organizationService.getAllOrganizations();
-            List<Map<String, Object>> tree = organizationService.buildOrganizationTree(organizations, null);
-            return ResponseEntity.ok(ApiResponse.success("获取组织树形结构成功", tree));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(ApiResponse.error("获取组织树形结构失败: " + e.getMessage()));
-        }
-    }
-    
-    /**
      * 根据ID获取组织详情
      * @param id 组织ID
      * @return 组织详情

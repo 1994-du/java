@@ -1,6 +1,5 @@
 package com.springbootproject.Service;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -8,23 +7,30 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import com.springbootproject.Entity.User;
 import com.springbootproject.Repository.UserRepository;
+import com.springbootproject.Repository.RoleRepository;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class UserService {
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-    
-    @Autowired
-    private UserRepository userRepository;
-    
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final PasswordEncoder passwordEncoder;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final JdbcTemplate jdbcTemplate;
+
+    public UserService(PasswordEncoder passwordEncoder,
+                       UserRepository userRepository,
+                       RoleRepository roleRepository,
+                       JdbcTemplate jdbcTemplate) {
+        this.passwordEncoder = passwordEncoder;
+        this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     public User findUserById(Long userId) {
-        return userRepository.findById(userId).orElse(null);
+        return userRepository.findById(Objects.requireNonNull(userId)).orElse(null);
     }
     
     public User findUserByUsername(String username) {
@@ -36,12 +42,12 @@ public class UserService {
     }
     
     public void deleteUserById(Long userId) {
-        if (!userRepository.existsById(userId)) {
+        if (!userRepository.existsById(Objects.requireNonNull(userId))) {
             throw new RuntimeException("用户不存在");
         }
         
         try {
-            userRepository.deleteById(userId);
+            userRepository.deleteById(Objects.requireNonNull(userId));
         } catch (Exception e) {
             throw new RuntimeException("删除用户失败: " + e.getMessage());
         }
@@ -60,7 +66,7 @@ public class UserService {
     }
     
     public Page<User> getAllUsers(Pageable pageable) {
-        return userRepository.findAll(pageable);
+        return userRepository.findAll(Objects.requireNonNull(pageable));
     }
     
     public List<User> searchByUsername(String username) {
@@ -69,7 +75,7 @@ public class UserService {
     
     public Page<User> searchUsers(String keyword, Pageable pageable) {
         if (keyword == null || keyword.trim().isEmpty()) {
-            return userRepository.findAll(pageable);
+            return userRepository.findAll(Objects.requireNonNull(pageable));
         }
         return userRepository.findByUsernameContaining(keyword, pageable);
     }
@@ -85,7 +91,7 @@ public class UserService {
     }
     
     public User updateUser(Long id, String username, String avatar, Long roleId, String gender) {
-        User user = userRepository.findById(id).orElse(null);
+        User user = userRepository.findById(Objects.requireNonNull(id)).orElse(null);
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }
@@ -108,17 +114,7 @@ public class UserService {
         
         if (roleId != null) {
             user.setRoleId(roleId);
-            
-            try {
-                Map<String, Object> roleMap = jdbcTemplate.queryForMap("SELECT id, name FROM sys_roles WHERE id = ?", roleId);
-                if (roleMap != null) {
-                    user.setRoleName((String) roleMap.get("name"));
-                } else {
-                    user.setRoleName("未知角色");
-                }
-            } catch (Exception e) {
-                user.setRoleName("查询失败");
-            }
+            user.setRoleName(resolveRoleName(roleId));
         }
         
         return userRepository.save(user);
@@ -143,19 +139,7 @@ public class UserService {
         
         if (roleId != null) {
             user.setRoleId(roleId);
-            
-            try {
-                Map<String, Object> roleMap = jdbcTemplate.queryForMap("SELECT id, name FROM sys_roles WHERE id = ?", roleId);
-                if (roleMap != null) {
-                    user.setRoleName((String) roleMap.get("name"));
-                } else {
-                    user.setRoleId(roleId);
-                    user.setRoleName("未知角色");
-                }
-            } catch (Exception e) {
-                user.setRoleId(roleId);
-                user.setRoleName("查询失败");
-            }
+            user.setRoleName(resolveRoleName(roleId));
         }
         
         user = userRepository.save(user);
@@ -187,6 +171,12 @@ public class UserService {
         
         return userRepository.save(user);
     }
+
+    private String resolveRoleName(Long roleId) {
+        return roleRepository.findById(Objects.requireNonNull(roleId))
+            .map(role -> Objects.requireNonNull(role).getName())
+                .orElse("未知角色");
+    }
     
     public User resetPassword(String username, String newPassword) {
         User user = userRepository.findByUsername(username);
@@ -199,7 +189,7 @@ public class UserService {
     }
 
     public User resetPassword(Long userId) {
-        User user = userRepository.findById(userId).orElse(null);
+        User user = userRepository.findById(Objects.requireNonNull(userId)).orElse(null);
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }

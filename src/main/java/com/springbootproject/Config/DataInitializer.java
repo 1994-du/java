@@ -3,7 +3,7 @@ package com.springbootproject.Config;
 import com.springbootproject.Entity.User;
 import com.springbootproject.Repository.UserRepository;
 import com.springbootproject.Service.MenuService;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -11,31 +11,34 @@ import org.springframework.stereotype.Component;
 @Component
 public class DataInitializer implements CommandLineRunner {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final MenuService menuService;
+    private final String initialAdminPassword;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private MenuService menuService;
+    public DataInitializer(UserRepository userRepository,
+                           PasswordEncoder passwordEncoder,
+                           MenuService menuService,
+                           @Value("${app.initial-admin-password:}") String initialAdminPassword) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.menuService = menuService;
+        this.initialAdminPassword = initialAdminPassword;
+    }
 
     @Override
     public void run(String... args) throws Exception {
         // 初始化管理员用户
         User adminUser = userRepository.findByUsername("admin");
-        if (adminUser == null) {
+        if (adminUser == null && !initialAdminPassword.isBlank()) {
             adminUser = new User();
             adminUser.setUsername("admin");
-            adminUser.setPassword(passwordEncoder.encode("admin"));
+            adminUser.setPassword(passwordEncoder.encode(initialAdminPassword));
             adminUser.setRoleId(1L);
             adminUser.setRoleName("超级管理员");
             adminUser.setAvatar("/uploads/avatars/default.jpeg");
             adminUser.setGender("男");
             
-            userRepository.save(adminUser);
-        } else {
-            adminUser.setPassword(passwordEncoder.encode("admin"));
             userRepository.save(adminUser);
         }
 

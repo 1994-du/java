@@ -36,22 +36,6 @@ public class DepartmentController {
     }
     
     /**
-     * 获取部门树形结构
-     * @return 部门树形结构
-     */
-    @GetMapping("/tree")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getDepartmentTree() {
-        try {
-            List<Department> departments = departmentService.getAllDepartments();
-            List<Map<String, Object>> tree = departmentService.buildDepartmentTree(departments, null);
-            return ResponseEntity.ok(ApiResponse.success("获取部门树形结构成功", tree));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(ApiResponse.error("获取部门树形结构失败: " + e.getMessage()));
-        }
-    }
-    
-    /**
      * 根据ID获取部门详情
      * @param id 部门ID
      * @return 部门详情
