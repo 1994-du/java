@@ -1,9 +1,11 @@
 package com.springbootproject.Service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.springbootproject.Entity.Menu;
+import com.springbootproject.Entity.Role;
 import com.springbootproject.Repository.MenuRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.springbootproject.Repository.RoleRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -19,11 +21,17 @@ import java.util.stream.Collectors;
 @Service
 public class MenuService {
 
-    @Autowired
-    private MenuRepository menuRepository;
+    private final MenuRepository menuRepository;
+    private final RoleRepository roleRepository;
+    private final ObjectMapper objectMapper;
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    public MenuService(MenuRepository menuRepository,
+            RoleRepository roleRepository,
+            ObjectMapper objectMapper) {
+        this.menuRepository = menuRepository;
+        this.roleRepository = roleRepository;
+        this.objectMapper = objectMapper;
+    }
 
     // 直接内存缓存，避免重复解析角色菜单
     private final Map<Long, CachedMenuTree> menuCache = new ConcurrentHashMap<>();
@@ -61,7 +69,7 @@ public class MenuService {
         }
         List<Menu> validMenus = menus.stream().filter(Objects::nonNull).collect(Collectors.toList());
         clearMenuCache();
-        return menuRepository.saveAll(validMenus);
+        return menuRepository.saveAll(Objects.requireNonNull(validMenus));
     }
 
     public void deleteMenu(Long menuId) {
@@ -155,7 +163,9 @@ public class MenuService {
 
         Map<Long, Menu> allMenusMap = menuRepository.findAll().stream()
                 .filter(Objects::nonNull)
-                .collect(Collectors.toMap(Menu::getId, this::cloneMenuNode, (left, right) -> left, LinkedHashMap::new));
+                .collect(Collectors.toMap(menu -> Objects.requireNonNull(menu.getId()),
+                        menu -> cloneMenuNode(Objects.requireNonNull(menu)),
+                        (left, right) -> left, LinkedHashMap::new));
 
         LinkedHashMap<Long, Menu> accessibleMenus = new LinkedHashMap<>();
         for (Long menuId : selectedMenuIds) {
@@ -168,17 +178,10 @@ public class MenuService {
     }
 
     public void preloadAllRoleMenus() {
-        try {
-            List<Map<String, Object>> roles = jdbcTemplate.queryForList(
-                    "SELECT id FROM sys_roles WHERE menus IS NOT NULL AND menus <> ''");
-
-            for (Map<String, Object> role : roles) {
-                Number roleIdNum = (Number) role.get("id");
-                if (roleIdNum != null) {
-                    getMenusByRoleId(roleIdNum.longValue());
-                }
+        for (Role role : roleRepository.findAll()) {
+            if (role.getId() != null && role.getMenus() != null && !role.getMenus().isBlank()) {
+                getMenusByRoleId(role.getId());
             }
-        } catch (Exception ignored) {
         }
     }
 
@@ -187,14 +190,9 @@ public class MenuService {
     }
 
     private String loadRoleMenusByRoleId(Long roleId) {
-        try {
-            Map<String, Object> roleMap = jdbcTemplate.queryForMap(
-                    "SELECT menus FROM sys_roles WHERE id = ?", roleId);
-            Object menus = roleMap.get("menus");
-            return menus == null ? null : menus.toString();
-        } catch (Exception e) {
-            return null;
-        }
+        return roleRepository.findById(Objects.requireNonNull(roleId))
+                .map(role -> Objects.requireNonNull(role).getMenus())
+                .orElse(null);
     }
 
     private static class CachedMenuTree {
@@ -282,9 +280,9 @@ public class MenuService {
 
             if (trimmed.startsWith("[")) {
                 try {
-                    return new com.fasterxml.jackson.databind.ObjectMapper().readValue(
+                    return objectMapper.readValue(
                             trimmed,
-                            new com.fasterxml.jackson.core.type.TypeReference<List<Long>>() {
+                            new TypeReference<List<Long>>() {
                             });
                 } catch (Exception ignored) {
                 }
