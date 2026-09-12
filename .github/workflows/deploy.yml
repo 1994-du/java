@@ -49,6 +49,13 @@ jobs:
           script: |
             set -e
 
+            JWT_SECRET='${{ secrets.JWT_SECRET }}'
+            if [ "${#JWT_SECRET}" -lt 64 ]; then
+              echo "GitHub Actions secret JWT_SECRET must contain at least 64 characters"
+              exit 1
+            fi
+            systemctl set-environment JWT_SECRET="$JWT_SECRET"
+
             systemctl stop springboot || true
 
             PIDS=$(ps -eo pid,args | awk '/[j]ava -jar \/root\/springBootProject-0.0.1-SNAPSHOT\.jar/{print $1}')
