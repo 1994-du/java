@@ -42,14 +42,16 @@ jobs:
 
       - name: restart service
         uses: appleboy/ssh-action@master
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: root
           key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: JWT_SECRET
           script: |
             set -e
 
-            JWT_SECRET='${{ secrets.JWT_SECRET }}'
             if [ "${#JWT_SECRET}" -lt 64 ]; then
               echo "GitHub Actions secret JWT_SECRET must contain at least 64 characters"
               exit 1
