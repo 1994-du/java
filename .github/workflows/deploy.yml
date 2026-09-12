@@ -61,13 +61,33 @@ jobs:
             ls -lh /root/springBootProject-0.0.1-SNAPSHOT.jar
 
             systemctl start springboot
-            sleep 8
+            health_ok=false
+            for i in $(seq 1 30); do
+              if curl --fail --silent --show-error http://127.0.0.1:1234/actuator/health >/tmp/springboot-health.json; then
+                health_ok=true
+                break
+              fi
+              sleep 2
+            done
 
             echo "===== springboot status ====="
             systemctl status springboot --no-pager -l || true
+
+            echo "===== springboot health ====="
+            if [ -f /tmp/springboot-health.json ]; then
+              cat /tmp/springboot-health.json
+            else
+              echo "No health response received"
+            fi
+
+            if [ "$health_ok" != true ]; then
+              echo "Spring Boot did not become healthy on port 1234"
+              journalctl -u springboot -n 100 --no-pager
+              exit 1
+            fi
 
             echo "===== java process ====="
             ps -ef | grep java | grep -v grep || true
 
             echo "===== port 1234 ====="
-            ss -lntp | grep 1234 || true
+            ss -lntp | grep 1234
