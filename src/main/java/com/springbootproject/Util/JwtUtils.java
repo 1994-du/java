@@ -41,7 +41,7 @@ public class JwtUtils {
         return claimsResolver.apply(claims);
     }
 
-    // 从token中获取所有声明
+    // 从token中获取所有声明 
     private Claims getAllClaimsFromToken(String token) {
         try {
             return Jwts.parserBuilder()

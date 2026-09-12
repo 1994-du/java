@@ -21,13 +21,20 @@ public class OrgStructureController {
     private OrgStructureService orgStructureService;
     
     /**
-     * 获取所有组织结构列表
+     * 获取组织结构列表（支持按类型过滤）
+     * @param type 类型（1: 组织, 2: 部门, 不传则获取全部）
      * @return 组织结构列表
      */
     @GetMapping("/list")
-    public ResponseEntity<ApiResponse<List<OrgStructure>>> getOrgStructures() {
+    public ResponseEntity<ApiResponse<List<OrgStructure>>> getOrgStructures(
+            @RequestParam(required = false) Integer type) {
         try {
-            List<OrgStructure> structures = orgStructureService.getAllOrgStructures();
+            List<OrgStructure> structures;
+            if (type != null) {
+                structures = orgStructureService.getOrgStructuresByType(type);
+            } else {
+                structures = orgStructureService.getAllOrgStructures();
+            }
             return ResponseEntity.ok(ApiResponse.success("获取组织结构列表成功", structures, (long) structures.size()));
         } catch (Exception e) {
             e.printStackTrace();
@@ -36,19 +43,18 @@ public class OrgStructureController {
     }
     
     /**
-     * 获取组织结构树形结构（支持通过parentId查询子节点）
-     * @param requestBody 请求体，包含parentId（可选，不传则查询根节点）
+     * 获取组织结构树形结构（支持通过parentId和type查询）
+     * @param parentId 父结构ID（可选）
+     * @param type 类型（1: 组织, 2: 部门, 不传则获取全部）
      * @return 组织结构树形结构
      */
-    @PostMapping("/tree")
-    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getOrgStructureTree(@RequestBody(required = false) Map<String, Long> requestBody) {
+    @GetMapping("/tree")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getOrgStructureTree(
+            @RequestParam(required = false) Long parentId,
+            @RequestParam(required = false) Integer type) {
         try {
-            Long parentId = null;
-            if (requestBody != null && requestBody.containsKey("parentId")) {
-                parentId = requestBody.get("parentId");
-            }
             List<OrgStructure> structures = orgStructureService.getAllOrgStructures();
-            List<Map<String, Object>> tree = orgStructureService.buildOrgStructureTree(structures, parentId);
+            List<Map<String, Object>> tree = orgStructureService.buildOrgStructureTree(structures, parentId, type);
             return ResponseEntity.ok(ApiResponse.success("获取组织结构树形结构成功", tree));
         } catch (Exception e) {
             e.printStackTrace();
@@ -191,6 +197,22 @@ public class OrgStructureController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).body(ApiResponse.error("获取组织结构列表失败: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * 根据所属组织ID获取部门列表
+     * @param organizationId 组织ID
+     * @return 组织结构列表
+     */
+    @GetMapping("/organization/{organizationId}")
+    public ResponseEntity<ApiResponse<List<OrgStructure>>> getOrgStructuresByOrganizationId(@PathVariable Long organizationId) {
+        try {
+            List<OrgStructure> structures = orgStructureService.getOrgStructuresByOrganizationId(organizationId);
+            return ResponseEntity.ok(ApiResponse.success("获取部门列表成功", structures, (long) structures.size()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(ApiResponse.error("获取部门列表失败: " + e.getMessage()));
         }
     }
     

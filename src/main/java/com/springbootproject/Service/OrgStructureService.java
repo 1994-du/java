@@ -57,9 +57,25 @@ public class OrgStructureService {
      * @return 组织结构树形结构
      */
     public List<Map<String, Object>> buildOrgStructureTree(List<OrgStructure> structures, Long parentId) {
+        return buildOrgStructureTree(structures, parentId, null);
+    }
+    
+    /**
+     * 构建组织结构树形结构（支持按类型过滤）
+     * @param structures 组织结构列表
+     * @param parentId 父结构ID
+     * @param type 类型（1: 组织, 2: 部门, null: 不过滤）
+     * @return 组织结构树形结构
+     */
+    public List<Map<String, Object>> buildOrgStructureTree(List<OrgStructure> structures, Long parentId, Integer type) {
         List<Map<String, Object>> tree = new ArrayList<>();
         
         for (OrgStructure structure : structures) {
+            // 按类型过滤
+            if (type != null && !type.equals(structure.getType())) {
+                continue;
+            }
+            
             // 支持 null 或 0 作为根节点的 parentId
             Long structureParentId = structure.getParentId();
             boolean isRootNode = (parentId == null && (structureParentId == null || structureParentId == 0))
@@ -74,9 +90,12 @@ public class OrgStructureService {
                 node.put("parentId", structure.getParentId());
                 node.put("isLeaf", structure.getIsLeaf());
                 node.put("level", structure.getLevel());
+                node.put("type", structure.getType());
+                node.put("organizationId", structure.getOrganizationId());
+                node.put("sort", structure.getSort());
                 
                 // 递归构建子结构
-                List<Map<String, Object>> children = buildOrgStructureTree(structures, structure.getId());
+                List<Map<String, Object>> children = buildOrgStructureTree(structures, structure.getId(), type);
                 if (!children.isEmpty()) {
                     node.put("children", children);
                 }
@@ -257,5 +276,43 @@ public class OrgStructureService {
         }
         
         return path.toString();
+    }
+    
+    /**
+     * 根据类型获取组织结构列表
+     * @param type 类型（1: 组织, 2: 部门）
+     * @return 组织结构列表
+     */
+    public List<OrgStructure> getOrgStructuresByType(Integer type) {
+        return orgStructureRepository.findByType(type);
+    }
+    
+    /**
+     * 根据类型和父结构ID获取组织结构列表
+     * @param type 类型（1: 组织, 2: 部门）
+     * @param parentId 父结构ID
+     * @return 组织结构列表
+     */
+    public List<OrgStructure> getOrgStructuresByTypeAndParentId(Integer type, Long parentId) {
+        return orgStructureRepository.findByTypeAndParentId(type, parentId);
+    }
+    
+    /**
+     * 根据类型和状态获取组织结构列表
+     * @param type 类型（1: 组织, 2: 部门）
+     * @param status 状态（1: 启用, 0: 禁用）
+     * @return 组织结构列表
+     */
+    public List<OrgStructure> getOrgStructuresByTypeAndStatus(Integer type, Integer status) {
+        return orgStructureRepository.findByTypeAndStatus(type, status);
+    }
+    
+    /**
+     * 根据所属组织ID获取部门列表
+     * @param organizationId 组织ID
+     * @return 组织结构列表
+     */
+    public List<OrgStructure> getOrgStructuresByOrganizationId(Long organizationId) {
+        return orgStructureRepository.findByOrganizationId(organizationId);
     }
 }

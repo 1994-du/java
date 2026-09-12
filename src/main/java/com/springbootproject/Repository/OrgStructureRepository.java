@@ -46,4 +46,34 @@ public interface OrgStructureRepository extends JpaRepository<OrgStructure, Long
      * @return 组织结构列表
      */
     List<OrgStructure> findByLevel(Integer level);
+    
+    /**
+     * 根据类型查询组织结构列表
+     * @param type 类型（1: 组织, 2: 部门）
+     * @return 组织结构列表
+     */
+    List<OrgStructure> findByType(Integer type);
+    
+    /**
+     * 根据类型和父结构ID查询组织结构列表
+     * @param type 类型（1: 组织, 2: 部门）
+     * @param parentId 父结构ID
+     * @return 组织结构列表
+     */
+    List<OrgStructure> findByTypeAndParentId(Integer type, Long parentId);
+    
+    /**
+     * 根据类型和状态查询组织结构列表
+     * @param type 类型（1: 组织, 2: 部门）
+     * @param status 状态（1: 启用, 0: 禁用）
+     * @return 组织结构列表
+     */
+    List<OrgStructure> findByTypeAndStatus(Integer type, Integer status);
+    
+    /**
+     * 根据所属组织ID查询部门列表
+     * @param organizationId 组织ID
+     * @return 组织结构列表
+     */
+    List<OrgStructure> findByOrganizationId(Long organizationId);
 }

@@ -41,6 +41,18 @@ public class OrgStructure {
     private String code;
     
     /**
+     * 类型（1: 组织, 2: 部门）
+     */
+    @Column(name = "type", nullable = false, columnDefinition = "int default 1")
+    private Integer type;
+    
+    /**
+     * 所属组织ID（部门使用，关联上级组织）
+     */
+    @Column(name = "organization_id")
+    private Long organizationId;
+    
+    /**
      * 结构状态（1: 启用, 0: 禁用）
      */
     @Column(name = "status", nullable = false, columnDefinition = "int default 1")
@@ -57,6 +69,12 @@ public class OrgStructure {
      */
     @Column(name = "level")
     private Integer level;
+    
+    /**
+     * 排序
+     */
+    @Column(name = "sort")
+    private Integer sort;
     
     // Getters and Setters
     public Long getId() {
@@ -121,5 +139,29 @@ public class OrgStructure {
     
     public void setLevel(Integer level) {
         this.level = level;
+    }
+    
+    public Integer getType() {
+        return type;
+    }
+    
+    public void setType(Integer type) {
+        this.type = type;
+    }
+    
+    public Long getOrganizationId() {
+        return organizationId;
+    }
+    
+    public void setOrganizationId(Long organizationId) {
+        this.organizationId = organizationId;
+    }
+    
+    public Integer getSort() {
+        return sort;
+    }
+    
+    public void setSort(Integer sort) {
+        this.sort = sort;
     }
 }
