@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/photos")
 public class PhotoController {
 
-    private static final long MAX_PHOTO_SIZE = 30 * 1024 * 1024; // 30MB
+    private static final long MAX_PHOTO_SIZE = 100 * 1024 * 1024; // 100MB
     /** 客户端只会预览图片，上传侧就挡掉非图片，避免下载端拿到打不开的文件 */
     private static final String[] IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"};
 
@@ -87,7 +87,7 @@ public class PhotoController {
             return ResponseEntity.badRequest().body(ApiResponse.error("文件不能为空"));
         }
         if (file.getSize() > MAX_PHOTO_SIZE) {
-            return ResponseEntity.badRequest().body(ApiResponse.error("文件大小不能超过30MB"));
+            return ResponseEntity.badRequest().body(ApiResponse.error("文件大小不能超过100MB"));
         }
         if (!looksLikeImage(file.getOriginalFilename(), file.getContentType())) {
             return ResponseEntity.badRequest().body(
@@ -136,6 +136,9 @@ public class PhotoController {
         if (!Files.exists(path)) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("文件不存在"));
         }
+        // 标记"已被取走"，供 PC 端区分"还没取"和"取过但没确认删除"；
+        // 真正的删除要等客户端保存成功后再调 /confirm，避免下载中断丢图
+        photoService.markDownloaded(user.getId(), id);
 
         Resource resource = new FileSystemResource(path);
         String ct = (p.getContentType() != null && !p.getContentType().isBlank())
@@ -160,7 +163,52 @@ public class PhotoController {
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("未登录或token无效"));
         }
+        photoService.deleteByUserAndIds(user.getId(), extractIds(body));
+        return ResponseEntity.ok(ApiResponse.success("删除成功", null));
+    }
+
+    /**
+     * 取件确认（单个）：PC 端把图片保存到本地成功后调用，服务器随即删除该文件。
+     * <p>
+     * 推荐给 PC 客户端用的完整链路：
+     * <pre>
+     *   GET  /api/photos                  列出待取图片
+     *   GET  /api/photos/download/{id}    下载并保存到本地
+     *   POST /api/photos/confirm/{id}     确认本地已保存成功 → 服务器删除
+     * </pre>
+     * 注意：不要在下载的同一个请求里删除，否则客户端还没落盘、源文件就没了。
+     */
+    @PostMapping("/confirm/{id}")
+    public ResponseEntity<?> confirmOne(@PathVariable Long id) {
+        return doConfirm(Collections.singletonList(id));
+    }
+
+    /** 取件确认（批量），body: {"ids":[1,2,3]} */
+    @PostMapping("/confirm")
+    public ResponseEntity<?> confirmBatch(@RequestBody Map<String, Object> body) {
+        return doConfirm(extractIds(body));
+    }
+
+    private ResponseEntity<?> doConfirm(List<Long> ids) {
+        User user = requireUser();
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("未登录或token无效"));
+        }
+        if (ids.isEmpty()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("请提供要确认的图片 id"));
+        }
+        int deleted = photoService.confirmAndDelete(user.getId(), ids);
+        Map<String, Object> data = new HashMap<>();
+        data.put("deleted", deleted);
+        return ResponseEntity.ok(ApiResponse.success("确认成功，服务器文件已删除", data));
+    }
+
+    /** 从请求体里安全地取出 ids（忽略非数字项），/delete 与 /confirm 共用 */
+    private List<Long> extractIds(Map<String, Object> body) {
         List<Long> ids = new ArrayList<>();
+        if (body == null) {
+            return ids;
+        }
         Object idsObj = body.get("ids");
         if (idsObj instanceof List<?>) {
             for (Object o : (List<?>) idsObj) {
@@ -169,7 +217,6 @@ public class PhotoController {
                 }
             }
         }
-        photoService.deleteByUserAndIds(user.getId(), ids);
-        return ResponseEntity.ok(ApiResponse.success("删除成功", null));
+        return ids;
     }
 }

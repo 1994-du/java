@@ -69,16 +69,48 @@ public class PhotoService {
      */
     public void deleteByUserAndIds(Long userId, List<Long> ids) {
         for (Long id : ids) {
-            photoRepository.findByUserIdAndId(userId, id).ifPresent(p -> {
-                try {
-                    Path f = storageService.getUserDir(userId).resolve(p.getStoredFilename());
-                    Files.deleteIfExists(f);
-                } catch (IOException ignored) {
-                    // 磁盘文件删不掉也不影响数据库记录清理
-                }
-                photoRepository.delete(p);
-            });
+            deleteOne(userId, id);
         }
+    }
+
+    /**
+     * 取件确认：PC 端把图片保存到本地成功后调用，服务端随即删除该中转文件与记录。
+     * <p>
+     * 与 {@link #deleteByUserAndIds} 的机制相同，区别在语义：本方法服务于
+     * "下载 → 落盘成功 → 确认删除" 这条链路，只有在客户端确认保存成功后才删，
+     * 因此下载中断不会误删服务器上的源文件。
+     *
+     * @return 实际删除的条数（id 不属于该用户或已不存在时不计入）
+     */
+    public int confirmAndDelete(Long userId, List<Long> ids) {
+        int deleted = 0;
+        for (Long id : ids) {
+            if (id != null && deleteOne(userId, id)) {
+                deleted++;
+            }
+        }
+        return deleted;
+    }
+
+    /**
+     * 删除单条记录及其磁盘文件。归属校验内联在查询里，拿不到别人的文件。
+     *
+     * @return true 表示确实删掉了一条
+     */
+    private boolean deleteOne(Long userId, Long id) {
+        Optional<Photo> opt = photoRepository.findByUserIdAndId(userId, id);
+        if (opt.isEmpty()) {
+            return false;
+        }
+        Photo p = opt.get();
+        try {
+            Path f = storageService.getUserDir(userId).resolve(p.getStoredFilename());
+            Files.deleteIfExists(f);
+        } catch (IOException ignored) {
+            // 磁盘文件删不掉也不影响数据库记录清理
+        }
+        photoRepository.delete(p);
+        return true;
     }
 
     public void markDownloaded(Long userId, Long id) {
