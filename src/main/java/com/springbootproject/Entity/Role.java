@@ -16,8 +16,14 @@ public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "name")
     private String name;  // 角色名称
+
+    @Column(name = "menus")
     private String menus;  // 菜单ID列表，JSON格式
+
+    @Column(name = "roleDesc")
     private String roleDesc;  // 角色描述
 
     // Getters and setters

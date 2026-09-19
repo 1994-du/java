@@ -10,36 +10,41 @@ public class ChatMessage {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
+    @Column(name = "userId")
     private Long userId;
-    
+
+    @Column(name = "username")
     private String username;
-    
-    @Column(length = 5000)
+
+    @Column(name = "message", length = 5000)
     private String message;
-    
+
+    @Column(name = "avatar")
     private String avatar;
 
-    @Column(length = 1000)
+    @Column(name = "imageUrl", length = 1000)
     private String imageUrl;
 
-    @Column(length = 1000)
+    @Column(name = "voiceUrl", length = 1000)
     private String voiceUrl;
 
-    @Column(length = 1000)
+    @Column(name = "audioUrl", length = 1000)
     private String audioUrl;
 
-    @Column(length = 1000)
+    @Column(name = "recordUrl", length = 1000)
     private String recordUrl;
 
-    @Column(length = 1000)
+    @Column(name = "mediaUrl", length = 1000)
     private String mediaUrl;
 
-    @Column(length = 50)
+    @Column(name = "messageType", length = 50)
     private String messageType;
 
+    @Column(name = "duration")
     private Integer duration;
-    
+
+    @Column(name = "createTime", columnDefinition = "datetime(6)")
     private LocalDateTime createTime;
 
     public ChatMessage() {

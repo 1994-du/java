@@ -10,14 +10,23 @@ public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "username")
     private String username;
-    
-    @Column(length = 60)
+
+    @Column(name = "password", length = 60)
     private String password;
-    
+
+    @Column(name = "avatar")
     private String avatar;
+
+    @Column(name = "roleId")
     private Long roleId;  // 添加角色ID字段
+
+    @Column(name = "roleName")
     private String roleName;  // 添加角色名称字段
+
+    @Column(name = "gender")
     private String gender;  // 添加性别字段
 
     // Getters and setters

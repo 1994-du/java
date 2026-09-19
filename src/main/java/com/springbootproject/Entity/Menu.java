@@ -23,7 +23,7 @@ public class Menu {
     @Column(name = "name", nullable = false, length = 64)
     private String name;
 
-    @Column(name = "component", length = 255)
+    @Column(name = "component", length = 255, nullable = false)
     private String component;
 
     @Column(name = "meta", length = 255)
