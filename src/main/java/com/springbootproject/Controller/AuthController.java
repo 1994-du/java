@@ -7,8 +7,10 @@ import com.springbootproject.Service.MenuService;
 import com.springbootproject.Service.UserService;
 import com.springbootproject.Util.JwtUtils;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -153,6 +155,43 @@ public class AuthController {
         response.addCookie(buildTokenCookie("user-token", null, 0));
 
         return ResponseEntity.ok(ApiResponse.success("退出登录成功", null));
+    }
+
+    /**
+     * 获取当前登录用户的完整信息：用户名、头像、角色，以及按角色过滤后的菜单。
+     * 供 SSO 登录回跳后前端凭 token 拉取（Authorization: Bearer <token>）。
+     */
+    @GetMapping("/me")
+    public ResponseEntity<?> me(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7).trim();
+        }
+
+        if (token == null || token.isEmpty() || !jwtUtils.validateToken(token)) {
+            return ResponseEntity.status(401).body(ApiResponse.error("未登录或token无效"));
+        }
+
+        String username = jwtUtils.extractUsername(token);
+        if (username == null || username.trim().isEmpty()) {
+            return ResponseEntity.status(401).body(ApiResponse.error("token解析失败"));
+        }
+
+        User user = userService.findUserByUsername(username);
+        if (user == null) {
+            return ResponseEntity.status(401).body(ApiResponse.error("用户不存在"));
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", user.getId());
+        data.put("username", user.getUsername());
+        data.put("avatar", user.getAvatar());
+        data.put("roleId", user.getRoleId());
+        data.put("roleName", user.getRoleName());
+        data.put("gender", user.getGender());
+        data.put("menus", menuService.getMenusByRoleId(user.getRoleId()));
+
+        return ResponseEntity.ok(ApiResponse.success("获取成功", data));
     }
 
     private Cookie buildTokenCookie(String cookieName, String token, int maxAge) {
